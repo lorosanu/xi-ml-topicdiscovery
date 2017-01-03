@@ -7,3 +7,5 @@ end
 require 'xi/ml/tools/logger'
 require 'xi/ml/tools/timer'
 require 'xi/ml/tools/component'
+
+require 'xi/ml/tools/utils'
