@@ -6,3 +6,4 @@ end
 
 require 'xi/ml/preprocess/language'
 require 'xi/ml/preprocess/cleaner'
+require 'xi/ml/preprocess/filter'
