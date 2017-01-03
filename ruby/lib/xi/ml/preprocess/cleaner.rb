@@ -9,3 +9,10 @@ require 'xi/ml/preprocess/cleaner/digit_cleaner'
 require 'xi/ml/preprocess/cleaner/lowercase_cleaner'
 require 'xi/ml/preprocess/cleaner/punct_cleaner'
 require 'xi/ml/preprocess/cleaner/whitespace_cleaner'
+
+# Do not load the NLP cleaner if NLP is not installed
+begin
+  require 'xi/ml/preprocess/cleaner/nlp_cleaner'
+rescue LoadError
+  nil
+end
