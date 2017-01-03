@@ -22,6 +22,13 @@ end
 require 'xi/ml/error'
 require 'xi/ml/tools'
 
+module Xi::ML
+  @logger = Xi::ML::Tools::Logger.create_root()
+  def self.logger
+    @logger
+  end
+end
+
 require 'xi/ml/corpus'
 require 'xi/ml/extract'
 require 'xi/ml/build'
