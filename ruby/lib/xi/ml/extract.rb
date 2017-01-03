@@ -3,3 +3,5 @@
 
 module Xi::ML::Extract
 end
+
+require 'xi/ml/extract/query'
