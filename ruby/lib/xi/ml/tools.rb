@@ -9,3 +9,4 @@ require 'xi/ml/tools/timer'
 require 'xi/ml/tools/component'
 
 require 'xi/ml/tools/utils'
+require 'xi/ml/tools/path_generator'
