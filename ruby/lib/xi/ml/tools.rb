@@ -5,3 +5,4 @@ module Xi::ML::Tools
 end
 
 require 'xi/ml/tools/logger'
+require 'xi/ml/tools/timer'
