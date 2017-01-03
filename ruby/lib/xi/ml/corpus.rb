@@ -5,3 +5,4 @@ module Xi::ML::Corpus
 end
 
 require 'xi/ml/corpus/push_corpus'
+require 'xi/ml/corpus/pull_corpus'
