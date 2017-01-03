@@ -19,7 +19,7 @@ Gem::Specification.new do |spec|
   spec.files            = `git ls-files -z lib/`.split("\x0")
   spec.extra_rdoc_files = `git ls-files -z conf/`.split("\x0") + %w{README}
   spec.bindir           = 'bin'
-  spec.executables      = %w[xi-ml-preparedata]
+  spec.executables      = %w[xi-ml-preparedata  xi-ml-classify]
 
   spec.add_runtime_dependency 'json', '~> 1.8', '>= 1.8.1'
   spec.add_runtime_dependency 'log4r', '~> 1.1', '>= 1.1.10'
