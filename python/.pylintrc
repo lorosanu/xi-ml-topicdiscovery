@@ -1,0 +1,24 @@
+[MESSAGES CONTROL]
+
+# C0111 = missing-docstring
+# R0204 = redefined-variable-type
+# R0801 = duplicate code
+# R0903 = too-few-public-methods
+# R0912 = too-many-branches
+# R0913 = too-many-arguments
+# R0914 = too-many-locals
+# R0915 = too-many-statements
+
+disable=C0111,R0204,R0801,R0903,R0912,R0913,R0914,R0915
+
+
+[BASIC]
+
+good-names=_,e,i,j,k,l,m,n,p,x,y,z,loggers
+variable-rgx=^[a-z_][a-z0-9_]{1,30}$
+
+
+[REPORTS]
+
+msg-template={path}:{line}: [{msg_id}({symbol}), {obj}] {msg}
+reports=no
