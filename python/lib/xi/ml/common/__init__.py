@@ -2,3 +2,4 @@
 
 
 from . import logger
+from .timer import Timer
