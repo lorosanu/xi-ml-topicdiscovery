@@ -3,6 +3,7 @@
 
 from .push_corpus import PushCorpus
 from .stream_corpus import StreamCorpus
+from .merge_corpora import MergeCorpora
 
 # gensim based models
 from . import pickler
