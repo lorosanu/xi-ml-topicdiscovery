@@ -2,4 +2,5 @@
 
 
 # gensim based models
+from . import pickler
 from . import dictionary
