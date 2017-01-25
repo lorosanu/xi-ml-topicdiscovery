@@ -25,6 +25,7 @@ setup(
     keywords='transformation and classification',
     package_dir = {'': 'lib'},
     packages=find_packages(),
+    scripts=['bin/xi-ml-processdemands'],
 
     classifiers=[
         'Development Status :: 4 - Beta',

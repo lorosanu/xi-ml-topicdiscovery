@@ -1,0 +1,49 @@
+res: /mnt/data/ml/resources/fr/es1preprod_24102016/
+classes:
+  - sport
+  - non-sport
+preprocessings:
+  - PDLW
+transformations:
+  - LSI
+classifiers:
+  LogisticRegression:
+    classif_types:
+      - multiclass
+    training_types:
+      - offline
+    chunk_sizes:
+      - -1
+      - 1000
+      - 10000
+      - 100000
+      - 1000000
+    kwargs:
+      penalty: l2
+      solver: liblinear
+      max_iter: 100
+  MLPClassifier:
+    classif_types:
+      - multiclass
+      - multilabel
+    training_types:
+      - offline
+    chunk_sizes:
+      - -1
+      - 1000
+      - 10000
+      - 100000
+      - 1000000
+    kwargs:
+      verbose: False
+      solver: adam
+      activation: relu
+      max_iter: 200
+      hidden_layer_sizes:
+        - 100
+execution:
+  - train_trans
+  - get_topics
+  - transform_data
+  - train_classifiers
+  - test_classifiers
