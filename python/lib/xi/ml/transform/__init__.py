@@ -3,3 +3,4 @@
 
 from .train_transformer import TrainTransformer
 from .load_transformer import LoadTransformer
+from .topics import Topics
