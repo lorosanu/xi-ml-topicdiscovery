@@ -2,6 +2,7 @@
 
 
 from .push_corpus import PushCorpus
+from .stream_corpus import StreamCorpus
 
 # gensim based models
 from . import pickler
