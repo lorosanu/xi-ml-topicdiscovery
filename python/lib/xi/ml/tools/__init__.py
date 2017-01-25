@@ -2,3 +2,4 @@
 
 
 from . import utils
+from .path_generator import PathGenerator
