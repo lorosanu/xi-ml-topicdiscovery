@@ -6,3 +6,4 @@ from .multiclass_classifier import MulticlassClassifier
 from .multilabel_classifier import MultilabelClassifier
 
 from .load_classifier import LoadClassifier
+from .prediction_statistics import PredictionStatistics
