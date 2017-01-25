@@ -3,3 +3,4 @@
 
 from . import logger
 from .timer import Timer
+from .component import Component
