@@ -1,8 +1,14 @@
 # -*-coding:utf-8 -*
 
 
+import os
 import sys
-from setuptools import setup
+from setuptools import setup, find_packages
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib'))
+sys.path.append(lib_path)
+
+from xi.ml import version
 
 
 with open('README', 'r') as f:
@@ -10,13 +16,15 @@ with open('README', 'r') as f:
 
 setup(
     name='xi.ml',
-    version='0.1.0',
+    version=version.__version__,
     author='Luiza Orosanu',
     author_email='luiza.orosanu@xilopix.com',
     description='Xilopix Machine-Learning Python project',
     long_description=long_description,
 
     keywords='transformation and classification',
+    package_dir = {'': 'lib'},
+    packages=find_packages(),
 
     classifiers=[
         'Development Status :: 4 - Beta',
