@@ -10,11 +10,16 @@ class ClassifierTest < Minitest::Unit::TestCase
 
   def setup
     lr_file = File.join(File.dirname(__FILE__), 'example_lr.json')
+    mlp_file = File.join(File.dirname(__FILE__), 'example_mlp.json')
 
     Xi::ML::Tools::Utils.check_file_readable!(lr_file)
+    Xi::ML::Tools::Utils.check_file_readable!(mlp_file)
 
     @lr_classifier = Xi::ML::Classify::Classifier.new(
       'LogisticRegression', lr_file)
+
+    @mlp_classifier = Xi::ML::Classify::Classifier.new(
+      'MLPClassifier', mlp_file)
 
     @doc_sport = '0.1435505 -0.1330716 0.0152118 -0.0124044 -0.0402427 '\
       '-0.127904 -0.0968397 -0.0015302 -0.0121994 0.1018563 -0.1142461 '\
@@ -143,6 +148,38 @@ class ClassifierTest < Minitest::Unit::TestCase
       probas: {
         'sport' => 0.15439201579094589,
         'non-sport' => 0.8456079842090541,
+      },
+    }
+
+    probas[:probas] = probas[:probas].map{|k, v| [k, '%.6f' % (v)] }.to_h
+    rprobas[:probas] = rprobas[:probas].map{|k, v| [k, '%.6f' % (v)] }.to_h
+
+    assert_equal rprobas, probas
+  end
+
+  def test_mlp_sport
+    probas = @mlp_classifier.classify_doc(@doc_sport)
+    rprobas = {
+      category: 'sport',
+      probas: {
+        'sport' => 0.9998468666083369,
+        'non-sport' => 0.00015313339166311848,
+      },
+    }
+
+    probas[:probas] = probas[:probas].map{|k, v| [k, '%.6f' % (v)] }.to_h
+    rprobas[:probas] = rprobas[:probas].map{|k, v| [k, '%.6f' % (v)] }.to_h
+
+    assert_equal rprobas, probas
+  end
+
+  def test_mlp_non_sport
+    probas = @mlp_classifier.classify_doc(@doc_non_sport)
+    rprobas = {
+      category: 'non-sport',
+      probas: {
+        'sport' => 0.06101909845389608,
+        'non-sport' => 0.9389809015461039,
       },
     }
 
