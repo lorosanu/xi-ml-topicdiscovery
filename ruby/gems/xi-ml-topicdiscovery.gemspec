@@ -22,7 +22,8 @@ Gem::Specification.new do |spec|
   spec.executables      = %w[
                           xi-ml-preparedata
                           xi-ml-classify
-                          xi-ml-transformdata]
+                          xi-ml-transformdata
+                          xi-ml-evaluatedata]
 
   spec.add_runtime_dependency 'json', '~> 1.8', '>= 1.8.1'
   spec.add_runtime_dependency 'log4r', '~> 1.1', '>= 1.1.10'
