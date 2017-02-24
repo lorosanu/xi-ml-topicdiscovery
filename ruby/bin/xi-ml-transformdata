@@ -1,0 +1,120 @@
+#!/usr/bin/ruby
+# encoding: utf-8
+
+
+require 'optparse'
+
+$LOAD_PATH.unshift 'lib/'
+require 'xi/ml'
+
+
+#======================================================================
+# Setup loggers level
+#======================================================================
+
+Xi::ML::Tools::Logger.global_level = Log4r::INFO
+
+
+#======================================================================
+# Parse the command line arguments
+#======================================================================
+
+@options = {}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Object: transform json corpora using known LSI model\n"
+  opts.banner << 'Usage: ./bin/xi-ml-transformdata [options]'
+
+  opts.on('-c CONF', '--conf CONF', 'Config file') {|v| @options[:conf] = v }
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+begin
+  parser.parse!
+  abort "[Error] Empty argument(s)\n\n#{parser}" if @options[:conf].nil?
+rescue OptionParser::InvalidOption => e1
+  abort "[Error] #{e1.message.capitalize}\n\n#{parser}"
+rescue OptionParser::MissingArgument => e2
+  abort "[Error] #{e2.message.capitalize}\n\n#{parser}"
+end
+
+Xi::ML::Tools::Utils.check_file_readable!(@options[:conf])
+
+
+#======================================================================
+# Load configuration
+#======================================================================
+
+begin
+  @conf = YAML.load(File.read(@options[:conf]))
+  abort "[Error] Empty list in YAML file '#{@options[:conf]}'" if @conf.empty?
+  abort "[Error] YAML object stored in '#{@options[:conf]}' is not a HASH" \
+    unless @conf.is_a?(Hash)
+rescue => e
+  abort "[Error] Bad format of YAML file '#{@options[:conf]}' : #{e.message}"
+end
+
+# @conf[:res]         which data to process
+# @conf[:classes]     process documents of classes 'classes'
+# @conf[:preprocess]  which preprocessing technique to evaluate
+# @conf[:transform]   which transformation models to apply on preprocessed data
+
+Xi::ML.logger.info("Processing current configuration:\n#{PP.pp(@conf, '')}")
+
+
+#======================================================================
+# Checkup config options
+#======================================================================
+
+[:res, :classes, :preprocess, :transform].each do |arg|
+  abort "Missing argument '#{arg}'" unless @conf.key?(arg)
+end
+
+
+#======================================================================
+# Set version and base resources directory variables
+#======================================================================
+
+ddata = @conf[:res]
+
+# paths for data: extracted, divided, preprocessed
+@local = Xi::ML::Tools::PathGenerator.new(ddata, @conf[:classes],
+  %w[train dev test],
+  [@conf[:preprocess]],
+  [@conf[:transform][:name]],
+  []
+)
+
+
+#======================================================================
+# Preload models
+#======================================================================
+
+Xi::ML.logger.info('Load transformation models')
+
+@transformer = Xi::ML::Transform::Transformer.new(
+  @conf[:transform][:name], @conf[:transform][:files])
+
+
+#======================================================================
+# Transform documents
+#======================================================================
+
+@conf[:classes].each do |category|
+  ['train', 'dev', 'test'].each do |subset|
+    input_file = @local.get_preprocessed_file(
+      category, subset, @conf[:preprocess])
+
+    output_file = @local.get_transformed_file(
+      category, subset, @conf[:transform][:name], @conf[:preprocess])
+
+    Xi::ML.logger.info("Transform #{category}-#{subset} documents")
+
+    @timer = Xi::ML::Tools::Timer.new()
+    @transformer.store_transformation(input_file, output_file)
+    @timer.stop_timer('Finished transformation')
+  end
+end
