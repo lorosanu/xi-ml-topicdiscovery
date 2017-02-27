@@ -1,51 +1,24 @@
 :res: /mnt/data/ml/resources/
+:version: es1preprod_22022017
 :lang: fr
 :classes:
+  - society
   - sport
-  - non-sport
+  - _UNK_
 :execution:
-  - :extract
-  - :build
   - :clean
-:extract:
-  :es:
-    :name: es1preprod
-    :ip: '192.168.2.3'
-    :host: localhost
-    :port: '9223'
-  :esquery:
-    :index:
-      - article
-      - product
-    :type:
-      - content
-    :source:
-      - id
-      - lang
-      - site
-      - url
-      - title
-      - content
-    :min_nchars: 200
-  :hosts:
-    sport: ./conf/fr/hosts_2classes/sport_hosts.yml
-    non-sport: ./conf/fr/hosts_2classes/non-sport_hosts.yml
-  :query_filter: host
-:build:
-  :division:
-    :train: 80
-    :dev: 10
-    :test: 10
 :clean:
   :preprocs:
-    :NS-PDLW:
+    :NV-PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::UpcaseCleaner
+        :args:
       - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
         :args:
           :lang: fr
-          :filter: Xi::ML::Preprocess::Filter::OnlyStemsFilter
+          :filter: Xi::ML::Preprocess::Filter::PosNVFilter
       - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
-        :args:
-      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
         :args:
       - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
         :args:

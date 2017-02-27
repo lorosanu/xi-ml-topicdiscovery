@@ -1,12 +1,8 @@
 :execution:
   - :clean
+  - :transform
+  - :classify
 :clean:
-  - :name: Xi::ML::Preprocess::Cleaner::UpcaseCleaner
-    :args:
-  - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
-    :args:
-      :lang: fr
-      :filter: Xi::ML::Preprocess::Filter::PosNVFilter
   - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
     :args:
   - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
@@ -15,3 +11,12 @@
     :args:
   - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
     :args:
+:transform:
+  :name: LSI
+  :files:
+    :dict: /tmp/ml-resources/dictionary.txt
+    :tfidf: /tmp/ml-resources/model_TFIDF.json
+    :lsi: /tmp/ml-resources/model_LSI.bin
+:classify:
+  :name: MLPClassifier
+  :file: /tmp/ml-resources/model_MLP-multiclass-3c.json

@@ -1,0 +1,12 @@
+:res: /mnt/data/ml/resources/fr/es1preprod_22022017/
+:classes:
+  - society
+  - sport
+  - _UNK_
+:preprocess: PDLW
+:transform:
+  :name: LSI
+  :files:
+    :dict: /tmp/ml-resources/dictionary.txt
+    :tfidf: /tmp/ml-resources/model_TFIDF.json
+    :lsi: /tmp/ml-resources/model_LSI.bin

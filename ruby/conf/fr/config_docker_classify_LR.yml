@@ -19,4 +19,4 @@
     :lsi: /tmp/ml-resources/model_LSI.bin
 :classify:
   :name: LogisticRegression
-  :file: /tmp/ml-resources/model_LR.json
+  :file: /tmp/ml-resources/model_LR-multiclass-3c.json
