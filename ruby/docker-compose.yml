@@ -1,0 +1,43 @@
+ml:
+  image: ml-devel
+  volumes:
+  - /mnt/data/ml/resources/:/mnt/data/ml/resources/
+
+ml-devel:
+  extends:
+    service: ml
+  volumes:
+  - ..:/src
+  working_dir: /src/ruby
+
+lab-ml-devel:
+  extends:
+    service: ml-devel
+  volumes:
+  - /mnt/data0/ml/resources/:/mnt/data0/ml/resources/
+
+mysql:
+  image: xi-nlp-mysql
+
+virtuoso:
+  image: xi-nlp-virtuoso
+
+ml-nlp-devel:
+  image: ml-nlp-devel
+  links:
+  - mysql
+  - virtuoso
+  volumes:
+  - ..:/src
+  - /mnt/data/ml/resources/:/mnt/data/ml/resources/
+  working_dir: /src/ruby
+
+lab-ml-nlp-devel:
+  image: ml-nlp-devel
+  links:
+  - mysql
+  - virtuoso
+  volumes:
+  - ..:/src
+  - /mnt/data0/ml/resources/:/mnt/data0/ml/resources/
+  working_dir: /src/ruby
