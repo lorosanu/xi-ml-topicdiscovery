@@ -1,0 +1,95 @@
+:res: /mnt/data/ml/resources/
+:lang: fr
+:classes:
+  - sport
+  - non-sport
+:execution:
+  - :extract
+  - :build
+  - :clean
+:extract:
+  :es:
+    :name: es1preprod
+    :ip: '192.168.2.3'
+    :host: localhost
+    :port: '9223'
+  :esquery:
+    :index:
+      - article
+      - product
+    :type:
+      - content
+    :source:
+      - id
+      - lang
+      - site
+      - url
+      - title
+      - content
+    :min_nchars: 200
+  :hosts:
+    sport: ./conf/fr/hosts_2classes/sport_hosts.yml
+    non-sport: ./conf/fr/hosts_2classes/non-sport_hosts.yml
+  :query_filter: host
+:build:
+  :division:
+    :train: 80
+    :dev: 10
+    :test: 10
+:clean:
+  :preprocs:
+    :PLW:
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:
+    :PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:
+    :NS-PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
+        :args:
+          :lang: fr
+          :filter: Xi::ML::Preprocess::Filter::OnlyStemsFilter
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:
+    :NPN-PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
+        :args:
+          :lang: fr
+          :filter: Xi::ML::Preprocess::Filter::PosNFilter
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:
+    :NPNV-PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
+        :args:
+          :lang: fr
+          :filter: Xi::ML::Preprocess::Filter::PosNVFilter
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:

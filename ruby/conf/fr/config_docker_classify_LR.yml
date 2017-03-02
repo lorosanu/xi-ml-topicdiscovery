@@ -1,0 +1,22 @@
+:execution:
+  - :clean
+  - :transform
+  - :classify
+:clean:
+  - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+    :args:
+  - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+    :args:
+  - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+    :args:
+  - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+    :args:
+:transform:
+  :name: LSI
+  :files:
+    :dict: /tmp/ml-resources/dictionary.txt
+    :tfidf: /tmp/ml-resources/model_TFIDF.json
+    :lsi: /tmp/ml-resources/model_LSI.bin
+:classify:
+  :name: LogisticRegression
+  :file: /tmp/ml-resources/model_LR.json
