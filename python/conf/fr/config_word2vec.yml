@@ -1,0 +1,9 @@
+res: /mnt/data/ml/resources/fr/es1preprod_22022017/
+input:
+  - data/society/preprocessed/PDLW/society_train.json
+  - data/sport/preprocessed/PDLW/sport_train.json
+  - data/_UNK_/preprocessed/PDLW/_UNK__train.json
+dictionary: dictionary/dictionary_PDLW.txt
+models:
+  'cbow': models/word2vec/cbow_PDLW/word2vec-cbow.bin
+  'skipgram': models/word2vec/skipgram_PDLW/word2vec-skipgram.bin
