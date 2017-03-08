@@ -4,6 +4,7 @@
 require 'xi/nlp'
 require 'xi/nlp/opennlp'
 require 'xi/nlp/lingua'
+require 'xi/nlp/morphalou'
 
 
 # The NLP cleaner: uses the 'xi-nlp' gem
@@ -22,7 +23,7 @@ class Xi::ML::Preprocess::Cleaner::NLPCleaner \
   #
   # @param lang [String] which language of NLP models to use
   # @param filter [Filter] which filter object to apply
-  def initialize(lang: nil, filter: nil)
+  def initialize(lang:nil, filter:nil)
     @logger = Xi::ML::Tools::Logger.create(self.class.name.downcase)
     checkups(lang, filter)
 
@@ -45,21 +46,22 @@ class Xi::ML::Preprocess::Cleaner::NLPCleaner \
     annotations = doc.instance_variable_get(:@annotations)
       .instance_variable_get(:@data)
 
-    tokens = annotations[:tokens]
-    stems = annotations[:stems]
-    postags = annotations[:postags]
+    tokens = annotations[:tokens] ? annotations[:tokens] : []
+    postags = annotations[:postags] ? annotations[:postags] : []
+    lemmas = annotations[:lemmas] ? annotations[:lemmas] : []
+    stems = annotations[:stems] ? annotations[:stems] : []
 
     clean_text = ''
 
     # output the data within the desired format
-    if tokens && stems && postags
+    unless tokens.empty?
       @processed_docs += 1
 
-      data = tokens.zip(stems, postags)
+      data = tokens.zip(postags, lemmas, stems)
       clean_text = @filter.filter(data)
 
       # display debugging information
-      nlp_example(annotations, data, clean_text) if @processed_docs == 0
+      nlp_example(data, clean_text) if @processed_docs == 1
 
       # reload NLP every 50k documents => avoid OOM errors
       reload_nlp() if @processed_docs % 50_000 == 0
@@ -90,37 +92,18 @@ class Xi::ML::Preprocess::Cleaner::NLPCleaner \
     Xi::NLP::Config.load_yaml(CONFIG)
     Xi::NLP.load()
 
-    lang_nlp_workflow = nil
-
-    case @lang
-    when 'fr'
-      lang_nlp_workflow = Xi::NLP::Base::AnalysisWorkflow.new([
-        Xi::NLP::OpenNLP::Tokenizer.new,
-        Xi::NLP::OpenNLP::PosTagger.new,
-        Xi::NLP::Lingua::SnowballStemmer.new,
-      ].map {|ac| ac.workflow })
-    when 'en'
-      lang_nlp_workflow = Xi::NLP::Base::AnalysisWorkflow.new([
-        Xi::NLP::OpenNLP::Tokenizer.new('en'),
-        Xi::NLP::OpenNLP::PosTagger.new('en'),
-        Xi::NLP::Lingua::SnowballStemmer.new('en'),
-      ].map {|ac| ac.workflow })
-    when 'de'
-      lang_nlp_workflow = Xi::NLP::Base::AnalysisWorkflow.new([
-        Xi::NLP::OpenNLP::Tokenizer.new('de'),
-        Xi::NLP::OpenNLP::PosTagger.new('de'),
-        Xi::NLP::Lingua::SnowballStemmer.new('de'),
-      ].map {|ac| ac.workflow })
-    end
+    lang_workflow = Xi::NLP::Base::AnalysisWorkflow.new([
+      Xi::NLP::OpenNLP::Tokenizer.new(@lang),
+      Xi::NLP::OpenNLP::PosTagger.new(@lang),
+      Xi::NLP::Morphalou::Lemmatizer.new(@lang),
+      Xi::NLP::Lingua::SnowballStemmer.new(@lang),
+    ].map {|ac| ac.workflow })
 
     workflow = Xi::NLP::Base::AnalysisWorkflow.new([
-      Xi::NLP::OpenNLP::SentenceDetector.new.workflow(),
-      Xi::NLP::Base::MapAnalysisWorkflow.new([lang_nlp_workflow]),
-      Xi::NLP::Base::MergeAnalysisWorkflow.new(delete: true),
+      Xi::NLP::Generic::SmoothText.new().workflow,
+      Xi::NLP::OpenNLP::SentenceDetector.new(@lang).workflow,
+      Xi::NLP::Base::MapAnalysisWorkflow.new([lang_workflow], merge: true),
     ])
-
-    raise Xi::ML::Error::DataError, 'NLP workflow error' \
-      unless workflow.static_check({ '' => { text: nil } })
 
     workflow
   end
@@ -133,11 +116,10 @@ class Xi::ML::Preprocess::Cleaner::NLPCleaner \
   end
 
   # Debug information
-  def nlp_example(annotations, data, clean_text)
+  def nlp_example(data, clean_text)
     @logger.info('Example of NLP Processing:')
-    @logger.debug(annotations.inspect)
-    data.each do |token, stem, tag|
-      @logger.info("token=#{token} stem=#{stem} tag=#{tag}")
+    data.each do |token, tag, lemma, stem|
+      @logger.info("token=#{token} pos=#{tag} lemma=#{lemma} stem=#{stem}")
     end
     @logger.info("Resulting output: #{clean_text}")
   end
