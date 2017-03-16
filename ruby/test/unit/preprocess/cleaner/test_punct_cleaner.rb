@@ -28,6 +28,11 @@ class PunctCleanerTest < Minitest::Unit::TestCase
     assert_equal 'après ça École', @cleaner.clean('après ça École')
   end
 
+  def test_non_latin
+    assert_equal 'après ça   École          ', \
+      @cleaner.clean('après ça 🚨 École 😱😱😱 😱🇫🇷 🔴')
+  end
+
   def test_apostrophe
     assert_equal "c' est quoi", @cleaner.clean("c'est quoi")
   end

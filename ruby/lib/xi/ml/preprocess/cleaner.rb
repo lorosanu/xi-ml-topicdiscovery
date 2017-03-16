@@ -9,6 +9,7 @@ require 'xi/ml/preprocess/cleaner/digit_cleaner'
 require 'xi/ml/preprocess/cleaner/lowercase_cleaner'
 require 'xi/ml/preprocess/cleaner/punct_cleaner'
 require 'xi/ml/preprocess/cleaner/whitespace_cleaner'
+require 'xi/ml/preprocess/cleaner/upcase_cleaner'
 
 # Do not load the NLP cleaner if NLP is not installed
 begin
