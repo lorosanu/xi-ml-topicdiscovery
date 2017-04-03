@@ -2,6 +2,6 @@
 
 module Xi
   module ML
-    VERSION = '0.4.0.dev'.freeze
+    VERSION = '0.4.0'.freeze
   end
 end

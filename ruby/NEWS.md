@@ -1,5 +1,23 @@
 # News
 
+## Xi-ML 0.4.0 - 03/04/2017
+* update code
+    - use stricter rules in the punctuation cleaner
+* optimise code
+    - speed up the LSI transformer lib
+* add execution scripts
+    - to transform documents from json corpora
+    - to classify documents from json corpora and evaluate predictions
+* add new features
+    - add a new class to split badly formatted 'upcase' words
+      (for words like 'JOURNEEJeudi')
+    - add a new class to format the document's url, text or nlp content
+      (extract possible usefull words)
+    - add prefix and regex based queries to match urls list
+    - include a lemmatizer into the NLP preprocessing lib
+      and add lemma-based filters
+    - add a new class for an MLP classifier (multiclass & multilabel)
+
 ## Xi-ML 0.3.0 - 02/02/2017
 * fix code after review
     - use constants where needed
@@ -27,5 +45,3 @@ Initial release
   => features arrays
 * classify documents: apply sklearn LogisticRegression model on features arrays
   => category sport/_unk_
-
-
