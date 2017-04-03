@@ -23,7 +23,12 @@ class Xi::ML::Corpus::PushCorpus < Xi::ML::Tools::Component
     @logger.info("Save new corpus in '#{output}' file")
 
     Xi::ML::Tools::Utils.create_path(output)
+
     @ofstream = File.open(output, 'w')
+
+    # use .sync = true for nlp preprocessing
+    @ofstream.sync = true
+
     @keys = keys.clone
     @size = 0
   end

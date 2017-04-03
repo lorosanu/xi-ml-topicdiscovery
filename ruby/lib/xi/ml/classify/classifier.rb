@@ -8,7 +8,8 @@ class Xi::ML::Classify::Classifier < Xi::ML::Tools::Component
   attr_reader :name, :model
 
   CLASSIFIERS = {
-      'LogisticRegression' => Xi::ML::Classify::LRClassifier
+      'LogisticRegression' => Xi::ML::Classify::LRClassifier,
+      'MLPClassifier' => Xi::ML::Classify::MLPClassifier,
     }.freeze
 
   # Initialize the classifier

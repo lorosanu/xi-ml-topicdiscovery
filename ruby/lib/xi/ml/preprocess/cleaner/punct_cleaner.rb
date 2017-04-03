@@ -9,13 +9,11 @@ class Xi::ML::Preprocess::Cleaner::PunctCleaner \
   def initialize(*)
   end
 
-  # Remove punctuation
+  # Remove all non alphanumeric characters
   # Add a space after apostrophe (ex: n'est => n' est)
   def clean(text)
-    # /[!@#$%^&*()\-=_+|;:"`,.<>?\[\]{}~\/]/
-    punctuation = %r{[!@#$%^&*()\-=_+|;:"`,.<>?\[\]{}~\/]}
-    text.gsub!(punctuation, ' ')
-    text.gsub("'", "' ")
+    ctext = text.gsub(/[^\p{Latin}0-9']/, ' ')
+    ctext.gsub!("'", "' ")
+    ctext
   end
-
 end

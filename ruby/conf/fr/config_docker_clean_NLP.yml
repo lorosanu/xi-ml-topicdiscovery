@@ -1,0 +1,8 @@
+:execution:
+  - :clean
+:clean:
+  - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
+    :args:
+      :lang: fr
+      :filter: Xi::ML::Preprocess::Filter::OnlyLemmasFilter
+

@@ -6,7 +6,8 @@
 class Xi::ML::Extract::Query < Xi::ML::Tools::Component
   attr_reader :input, :lang, :hosts, :rules
 
-  FILTERS = %w[host url].freeze
+  FILTERS = %w[host url-qs url-prefix url-regexp].freeze
+  FORMATS = %w[query_string query_filtered].freeze
 
   # Initialize the query: create the rules
   #   based on the list of hosts extracted from the input file
@@ -47,6 +48,8 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
       raise Xi::ML::Error::CaughtException, \
         "Bad format of YAML file '#{@input}' : #{e.message}"
     end
+
+    @logger.info("#{@hosts.size} urls given")
   end
 
   # Prepare the ES query based on the hosts / urls list
@@ -57,8 +60,12 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
     case filter
     when 'host'
       @rules = filter_hosts()
-    when 'url'
-      @rules = filter_urls()
+    when 'url-qs'
+      @rules = filter_urls_qs()
+    when 'url-prefix'
+      @rules = filter_urls_prefix()
+    when 'url-regexp'
+      @rules = filter_urls_regexp()
     end
 
     @rules
@@ -71,7 +78,7 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
   #
   # @return [String] the generated query rules
   def filter_hosts
-    rules = ''
+    rules = []
     count_urls = 0
 
     @hosts.each do |item|
@@ -93,34 +100,64 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
         cquery = '(' << site.join(' AND ') << ')'
 
         # group up all queries with an "OR" clause
-        rules += cquery << ' OR '
+        rules << cquery
         count_urls += 1
       end
     end
 
-    @logger.info("#{@hosts.size} urls given => #{count_urls} hosts considered")
-
-    # remove final OR keyword (+ whitespaces)
-    rules = rules[0..-5]
+    @logger.info("#{count_urls} hosts considered")
 
     raise Xi::ML::Error::DataError, "Empty query built from the #{@input} file"\
       if rules.empty?
 
-    # final setup
-    rules = "lang:#{@lang} AND ( #{rules} )"
+    # match one rule at a time: OR query
+    rules = rules.join(' OR ')
 
-    # query format
-    query = "{ query: { query_string: { query: \"#{rules}\" } } }"
-
-    # return query
-    query
+    # return formatted query
+    format_query('query_string', rules)
   end
 
   # Keep entire url and use an ES query on 'url'
   #
   # @return [String] the generated query rules
-  def filter_urls
-    rules = ''
+  def filter_urls_qs
+    rules = []
+
+    @hosts.each do |url|
+      # remove http/https/www prefix
+      url = url.sub(%r{^https?\:\/\/}, '')
+      url = url.sub(/^(www.)?/, '')
+
+      next if url.empty?
+
+      # escape :/ (mandatory for query_string)
+      url.gsub!(%r{\/}, '\\\\\/')
+      url.gsub!(/:/, '\\\\\:')
+
+      # prepare 4 urls with 4 possible prefixes (http, https, wwww)
+      hurls = []
+      hurls << "http\\\\:\\\\/\\\\/#{url}*"
+      hurls << "http\\\\:\\\\/\\\\/www.#{url}*"
+      hurls << "https\\\\:\\\\/\\\\/#{url}*"
+      hurls << "https\\\\:\\\\/\\\\/www.#{url}*"
+
+      hurls.each do |hurl|
+        rules << "url:#{hurl}"
+      end
+    end
+
+    raise Xi::ML::Error::DataError, "Empty query built from the #{@input} file"\
+      if rules.empty?
+
+    # match one rule at a time: OR query
+    rules = rules.join(' OR ')
+
+    # return formatted query
+    format_query('query_string', rules)
+  end
+
+  def filter_urls_prefix
+    rules = []
 
     @hosts.each do |url|
       # remove http/https/www prefix
@@ -131,44 +168,87 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
 
       # prepare 4 urls with 4 possible prefixes (http, https, wwww)
       hurls = []
-      hurls << "http://#{url}*"
-      hurls << "http://www.#{url}*"
-      hurls << "https://#{url}*"
-      hurls << "https://www.#{url}*"
+      hurls << "\"http://#{url}\""
+      hurls << "\"http://www.#{url}\""
+      hurls << "\"https://#{url}\""
+      hurls << "\"https://www.#{url}\""
 
       hurls.each do |hurl|
-        # escape :/ (mandatory for query_string)
-        hurl.gsub!(%r{\/}, '\\/')
-        hurl.gsub!(/:/, '\\:')
-        hurl.gsub!(%r{\/}, '\\/')
-        hurl.gsub!(/:/, '\\:')
-
-        rules << 'url:' << hurl << ' OR '
+        rules << "{prefix: { url:#{hurl} } }"
       end
     end
-
-    @logger.info("#{@hosts.size} urls given")
-
-    # remove final OR keyword (+ whitespaces)
-    rules = rules[0..-5]
 
     raise Xi::ML::Error::DataError, "Empty query built from the #{@input} file"\
       if rules.empty?
 
-    # final setup
-    rules = "lang:#{@lang} AND ( #{rules} )"
+    # add ', ' between rules
+    rules = rules.join(', ')
 
-    # query format
-    query = "{ query: { query_string: { query: \"#{rules}\" } } }"
+    # return formatted query
+    format_query('query_filtered', rules)
+  end
 
-    # return query
-    query
+  def filter_urls_regexp
+    rules = []
+
+    @hosts.each do |url|
+      # remove http/https/www prefix
+      url = url.sub(%r{^https?\:\/\/}, '')
+      url = url.sub(/^(www.)?/, '')
+
+      next if url.empty?
+
+      rules << "{regexp: { url:\"(https?://(www.)?)?#{url}.*\"} }"
+    end
+
+    raise Xi::ML::Error::DataError, "Empty query built from the #{@input} file"\
+      if rules.empty?
+
+    # add ', ' between rules
+    rules = rules.join(', ')
+
+    # return formatted query
+    format_query('query_filtered', rules)
+  end
+
+  def format_query(type, rules)
+    query = ''
+
+    case type
+    when 'query_string'
+      query = <<-EOS
+      {
+        query: {
+          query_string: {
+            query: \"lang:#{@lang} AND ( #{rules} )\"
+          }
+        }
+      }
+      EOS
+    when 'query_filtered'
+      query = <<-EOS
+      {
+        query: {
+          filtered: {
+            query: { bool: { should: [ #{rules} ] } },
+            filter: { term: { lang: \"#{@lang}\" } }
+          }
+        }
+      }
+      EOS
+    else
+      @logger.error(
+        "Unknown query format option '#{type}'. Choose from #{FORMATS}")
+    end
+
+    query.strip.gsub(/\s+/, ' ')
   end
 
   def to_s
     @rules
   end
 
-  private :read_hosts, :prepare_rules, :filter_hosts, :filter_urls
-
+  private :read_hosts, :prepare_rules, \
+    :filter_hosts, :filter_urls_qs, :filter_urls_prefix, :filter_urls_regexp, \
+    :format_query
 end

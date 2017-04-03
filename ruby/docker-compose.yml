@@ -2,6 +2,7 @@ ml:
   image: ml-devel
   volumes:
   - /mnt/data/ml/resources/:/mnt/data/ml/resources/
+  - /mnt/data/ml/caid_models/:/mnt/data/ml/caid_models/
 
 ml-devel:
   extends:

@@ -11,3 +11,5 @@ require 'xi/ml/tools/component'
 require 'xi/ml/tools/utils'
 require 'xi/ml/tools/path_generator'
 require 'xi/ml/tools/model_binarizer'
+
+require 'xi/ml/tools/formatter'

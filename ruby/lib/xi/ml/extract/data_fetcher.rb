@@ -130,9 +130,7 @@ class Xi::ML::Extract::DataFetcher < Xi::ML::Tools::Component
           url = UnicodeUtils.downcase(doc['_source']['url'])
           title = UnicodeUtils.downcase(doc['_source']['title'])
 
-          words = url.split(%r{\s|:|_|-|=|&|\?|\\|\/|\.})
-          words.delete_if {|w| w.empty? || STRIP_URL.include?(w) }
-
+          words = Xi::ML::Tools::Formatter.words_from_url(url).split()
           words.concat(title.split())
           words.uniq!
 
@@ -148,8 +146,10 @@ class Xi::ML::Extract::DataFetcher < Xi::ML::Tools::Component
         entry['content'].gsub!(/\n/, '. ')
       when 'content_analyzed'
         # recover array of [word, stem, pos]
-        # entry['content_nlp']=process_nlp(doc['_source']['content_analyzed'])\
-        #   if doc['_source']['content_analyzed']
+        if doc['_source']['content_analyzed']
+          nlp = doc['_source']['content_analyzed']
+          entry['content_nlp'] = Xi::ML::Tools::Formatter.words_from_nlp(nlp)
+        end
       else
         @logger.warn("Unknown requested field '#{field}'. "\
           'You should add a new feature to the gem. '\
@@ -165,84 +165,5 @@ class Xi::ML::Extract::DataFetcher < Xi::ML::Tools::Component
     entry
   end
 
-  # Process the "content_analyzed" entry
-  #
-  # param json_data [JSON] the 'content_analyzed' ES entry in JSON format
-  def process_nlp(json_data)
-    data = JSON.load(json_data)
-
-    nlp = []
-    token = { word: nil, stem: nil, postag: nil }
-
-    data.each do |item|
-      # warn and skip the current token if not valid
-      unless valid?(item)
-        token = { word: nil, stem: nil, postag: nil }
-        next
-      end
-
-      # if pos_inc is greater than zero then a new token is being parsed
-      if item['pos_inc'] > 0
-        # if there is a previous token with a non-empty word then enqueue it
-        nlp << token.values unless token[:word].nil?
-
-        # instanciate a new current token
-        token = { word: nil, stem: nil, postag: nil }
-      end
-
-      # Set the current token field (word/stem/postag) with the extracted value
-      # - word =>  token: 'value'
-      # - stem =>  token: 'stem#S#'
-      # - lemma => token: 'lemma#L#postag'
-
-      type = item['type']
-      value = item['token']
-
-      if type == 'lemma'
-        token[:postag] = value.split('#').last
-      elsif type == 'stem'
-        token[:stem] = value.split('#').first
-      else
-        token[:word] = value
-      end
-    end
-
-    # add last entry when valid
-    nlp << token.values unless token[:word].nil? && nlp[-1] == token.values
-
-    # return only the list of stems (stem replaced by word when not available)
-    nlp.map{|x| (x[1] ? x[1] : x[0]) }.join(' ')
-  end
-
-  # Check if an object recovered from the content_analyzed field is valid
-  def valid?(item)
-    unless item['pos_inc'] && item['type'] && item['token']
-      @logger.warn("Content analyzed item should include \
-        'pos_inc', 'type' and 'token' fields")
-      return false
-    end
-
-    unless item['pos_inc'].is_a?(Integer)
-      @logger.warn("Token pos_inc is expected to be Integer, \
-        get #{item['pos_inc'].class.name.inspect}, token skipped")
-      return false
-    end
-
-    unless item['token'].is_a?(String)
-      @logger.warn("Token value is expected to be String, \
-        get #{value.class.name.inspect}, token skipped")
-      return false
-    end
-
-    expected_types = %w[word stem lemma]
-    unless expected_types.include?(item['type'])
-      @logger.warn("Token type is expected to be one of #{expected_types}, \
-        get #{type.inspect}, token skipped")
-      return false
-    end
-
-    true
-  end
-
-  private :process_result, :valid?, :process_nlp
+  private :process_result
 end

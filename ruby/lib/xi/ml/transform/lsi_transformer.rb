@@ -97,41 +97,34 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
     raise Xi::ML::Error::ConfigError, 'Input data is not a String object' \
       unless text.is_a?(String)
 
-    # compute known word frequencies
-    words = {}
-    words.default = 0
-    uwords = text.split(' ')
+    # compute known word frequencies: word_id => word_frequency
+    freq = {}
+    freq.default = 0
 
-    uwords.each do |word|
-      words[word] += 1 if @dictionary.key?(word)
+    text.split.each do |word|
+      freq[@dictionary[word]] += 1 if @dictionary.key?(word)
     end
 
-    uwords = words.keys.uniq.sort
-    return '' if uwords.empty?
+    return '' if freq.empty?
+
+    # list of sorted ids
+    ids = freq.keys
 
     # compute TF-IDF features
-    tfidf_weights = []
-    uwords.each do |word|
-      id = @dictionary[word]
-      freq = words[word]
-      tfidf_weights << freq * @tfidf_model[id]
-    end
+    tfidf_weights = ids.map{|id| freq[id] * @tfidf_model[id] }
     tfidf_weights = normalize_weights(tfidf_weights)
 
-    # compute LSI features
-    lsi_features = []
-    begin
-      (0...@n_topics).each do |i|
-        lsi_features[i] = 0
+    # recover LSI weights for current document
+    lsi_weights = ids.map{|id| @lsi_model[id] }
 
-        uwords.each_with_index do |word, windex|
-          id = @dictionary[word].to_i
-          lsi_features[i] += tfidf_weights[windex] * @lsi_model[id][i]
-        end
+    # compute LSI features
+    lsi_features = Array.new(@n_topics, 0)
+
+    @n_topics.times do |topic_id|
+      ids.size.times do |word_index|
+        lsi_features[topic_id] += \
+          tfidf_weights[word_index] * lsi_weights[word_index][topic_id]
       end
-    rescue => e
-      raise Xi::ML::Error::CaughtException, \
-        "Exception encountered when computing lsi features: #{e.message}"
     end
 
     lsi_features.join(' ')
@@ -139,11 +132,14 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
 
   # compute the TF-IDF l2 norm on given weights
   def normalize_weights(weights)
-    svalues = weights.map{|freq| freq * freq }
-    length = svalues.reduce{|sum, freq| sum + freq }
-    length = Math.sqrt(length)
-    nweights = weights.map{|freq| freq / length }
-    nweights
+    # compute norm = sqrt(sum_i (x_i * x_i))
+    norm = 0
+    weights.each {|weight| norm += weight**2 }
+    norm = Math.sqrt(norm)
+
+    # normalize by norm
+    weights.map!{|weight| weight / norm }
+    weights
   end
 
   private :load_dict, :load_tfidf, :load_lsi, :normalize_weights
