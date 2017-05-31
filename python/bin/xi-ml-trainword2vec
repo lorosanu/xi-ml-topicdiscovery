@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+# -*-coding:utf-8 -*
+
+
+import logging
+import argparse
+
+import os
+import sys
+import yaml
+import itertools
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../lib'))
+sys.path.append(lib_path)
+
+from xi.ml.common import Timer
+from xi.ml.tools import utils
+from xi.ml.transform import TrainWord2Vec
+
+#=============================================
+# Parse the command line arguments
+#=============================================
+
+options = {}
+
+parser = argparse.ArgumentParser(
+    description='Train the word2vec model')
+parser.add_argument('conf', help='input config file (yml)')
+options = parser.parse_args()
+
+# check config file existance
+if not os.path.isfile(options.conf):
+    exit("[Error] Config file '{}' not found".format(options.conf))
+
+#=============================================
+# Logger setup
+#=============================================
+
+logger = logging.getLogger('xi.ml')
+
+# logger setup for gensim
+logging.basicConfig(
+    format='[%(name)s] [%(asctime)s] %(levelname)s : %(message)s',
+    level=logging.INFO)
+
+#=============================================
+# Load configuration
+#=============================================
+
+conf = {}
+
+with open(options.conf, 'r') as stream:
+    try:
+        conf = yaml.load(stream)
+    except yaml.YAMLError as exc:
+        exit("[Error] Exception encountered during YAML load: {}".format(exc))
+
+if not isinstance(conf, dict):
+    exit("[Error] Not a dict object stored in '{}'".format(options.conf))
+
+if not conf:
+    exit("[Error] Empty configuration in '{}'".format(options.conf))
+
+#=============================================
+# Configuration checkups
+#=============================================
+
+for key in ['res', 'input', 'models']:
+    if key not in conf:
+        exit("[Error] Missing mandatory config option '{}'".format(key))
+
+if 'dictionary' in conf:
+    utils.check_file_readable(os.path.join(conf['res'], conf['dictionary']))
+
+logger.info("Current configuration: {}".format(conf))
+
+#=============================================
+# Train transformation models
+#=============================================
+
+timer = Timer()
+
+for trans_name, trans_file in conf['models'].items():
+    logger.info("Training '{}' model".format(trans_name))
+
+    # dictionary
+    dict_file = None
+    if 'dictionary' in conf:
+        dict_file = os.path.join(conf['res'], conf['dictionary'])
+
+    # list of training files
+    train_files = conf['input']
+    train_files = [os.path.join(conf['res'], fn) for fn in train_files]
+
+    # files for other model formats
+    bin_file = os.path.join(conf['res'], trans_file)
+    json_file = utils.change_extension(bin_file, 'json')
+    filtered_json_file = utils.change_extension(bin_file, 'filtered.json')
+
+    # train model
+    timer.start_timer()
+    model = TrainWord2Vec(trans_name)
+    model.train(train_files)
+    timer.stop_timer("{} transformation trained".format(trans_name))
+
+    model.save(bin_file)
+    model.save_shape(json_file)
+    model.save_shape(filtered_json_file, dict_file)
