@@ -1,6 +1,6 @@
 # News
 
-## Python Xi-ML 0.1.0 - 25/01/2017
+## Python Xi-ML 0.1.0 - 31/05/2017
 Initial release
 
 * use gensim to:
@@ -14,6 +14,4 @@ Initial release
 * use sklearn to:
   * train document classifiers on transformed data
   * classify documents: apply LogisticRegression/MLPClassifier/... model
-    on features arrays => category sport/non-sport
-
-
+    on features arrays => category sport/society/...
