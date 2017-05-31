@@ -1,0 +1,411 @@
+#!/usr/bin/python3
+# -*-coding:utf-8 -*
+
+
+import logging
+import argparse
+
+import os
+import sys
+import yaml
+import itertools
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../lib'))
+sys.path.append(lib_path)
+
+from xi.ml.common import Timer
+from xi.ml.tools import utils, PathGenerator
+from xi.ml.corpus import dictionary, pickler, LoadCorpora
+from xi.ml.transform import TrainTransformer, LoadTransformer, Topics
+from xi.ml.classify import TrainClassifier, LoadClassifier, \
+    PredictionStatistics, EvalMetrics
+
+#=============================================
+# Parse the command line arguments
+#=============================================
+
+options = {}
+
+parser = argparse.ArgumentParser(
+    description='Train and test models based on requests')
+parser.add_argument('conf', help='input config file (yml)')
+options = parser.parse_args()
+
+# check config file existance
+if not os.path.isfile(options.conf):
+    exit("[Error] Config file '{}' not found".format(options.conf))
+
+#=============================================
+# Logger setup
+#=============================================
+
+logger = logging.getLogger('xi.ml')
+
+# logger setup for gensim
+logging.basicConfig(
+    format='[%(name)s] [%(asctime)s] %(levelname)s : %(message)s',
+    level=logging.INFO)
+
+#=============================================
+# Load configuration
+#=============================================
+
+conf = {}
+
+with open(options.conf, 'r') as stream:
+    try:
+        conf = yaml.load(stream)
+    except yaml.YAMLError as exc:
+        exit("[Error] Exception encountered during YAML load: {}".format(exc))
+
+if not isinstance(conf, dict):
+    exit("[Error] Not a dict object stored in '{}'".format(options.conf))
+
+if not conf:
+    exit("[Error] Empty configuration in '{}'".format(options.conf))
+
+#=============================================
+# Configuration checkups
+#=============================================
+
+for key in ['classes', 'res', 'execution']:
+    if key not in conf:
+        exit("[Error] Missing mandatory config option '{}'".format(key))
+
+if not os.path.isdir(conf['res']):
+    exit("[Error] Data folder '{}' not found".format(conf['res']))
+
+logger.info("Current configuration: {}".format(conf))
+
+#=============================================
+# Set local ressources configuration
+# - where to save the data
+# - where to save the models
+# - ...
+#=============================================
+
+preprocessings = conf['preprocessings'] if 'preprocessings' in conf else []
+transformations = conf['transformations'] if 'transformations' in conf else []
+classifiers = conf['classifiers'] if 'classifiers' in conf else {}
+
+local = PathGenerator(
+    conf['res'], conf['classes'], ['train', 'dev', 'test'],
+    preprocessings, transformations, classifiers.keys())
+
+#=============================================
+# Train transformation models
+#=============================================
+
+timer = Timer()
+
+if 'train_trans' in conf['execution']:
+
+    params = {
+        'transformation': transformations,
+        'preprocessing': preprocessings
+    }
+
+    for combination in itertools.product(*params.values()):
+        dict_comb = dict(zip(params.keys(), combination))
+        trans = dict_comb['transformation']
+        preproc = dict_comb['preprocessing']
+
+        logger.info("Training '{}-{}' model".format(trans, preproc))
+
+        # list of training files
+        train_files = local.preprocessed_files(preproc, 'train')
+
+        # files for dictionary, bow corpus, tf-idf corpus, transformation model
+        dict_file = local.dictionary(preproc)
+        dict_file_txt = utils.change_extension(dict_file, 'txt')
+        bow_file = local.transformation_model('bow', trans, preproc)
+        tfidf_file = local.transformation_model('tfidf', trans, preproc)
+        trans_file = local.transformation_model(trans, trans, preproc)
+
+        #-------------------------------------------
+        # set up, filter and save the dictionary
+        #-------------------------------------------
+
+        logger.info("Create a new corpus on '{}' files".format(train_files))
+        timer.start_timer()
+
+        corpus = LoadCorpora(train_files)
+
+        logger.info(
+            'Filter the dictionary: remove words seen '
+            'in less than 3 documents and in more than 75% documents')
+
+        corpus.dictionary.filter_extremes(
+            no_below=3, no_above=0.75, keep_n=None)
+
+        corpus.dictionary.save(dict_file)
+        corpus.dictionary.save_as_text(dict_file_txt)
+
+        timer.stop_timer('Dictionary created and filtered')
+
+        #-------------------------------------------
+        # set the bow representation
+        # (executed when iterating over the corpus)
+        #-------------------------------------------
+
+        logger.info('Set up and save the bow representation')
+        timer.start_timer()
+
+        pickler.save(bow_file, corpus)
+        timer.stop_timer('BOW transformation executed')
+
+        #-------------------------------------------
+        # train the transformation model
+        #-------------------------------------------
+
+        # (re)load dictionary and bow_corpus
+        bow_corpus = pickler.load(bow_file)
+        dictionary = dictionary.load(dict_file)
+
+        if trans == "LDA":
+            logger.info('Train the LDA transformation model')
+
+            timer.start_timer()
+            model = TrainTransformer(trans)
+            model.train(bow_corpus, dictionary)
+            model.save(trans_file)
+            timer.stop_timer('LDA transformation trained')
+        else:
+            logger.info('Train the tf-idf transformation model')
+
+            timer.start_timer()
+            tfidf_model = TrainTransformer('TFIDF')
+            tfidf_model.train(bow_corpus)
+            tfidf_model.save(tfidf_file)
+            tfidf_model.save_shape(utils.change_extension(tfidf_file, 'json'))
+            timer.stop_timer('TFIDF transformation executed')
+
+            # transform bow_corpus into tfidf_corpus
+            tfidf_corpus = tfidf_model.model[bow_corpus]
+
+            # train the model
+            logger.info("Train the {} transformation model".format(trans))
+
+            timer.start_timer()
+            model = TrainTransformer(trans)
+            model.train(tfidf_corpus, dictionary)
+            model.save(trans_file)
+            model.save_shape(utils.change_extension(trans_file, 'json'))
+            timer.stop_timer("{} transformation trained".format(trans))
+
+#=============================================
+# Get topics
+#=============================================
+
+if 'get_topics' in conf['execution']:
+
+    params = {
+        'transformation': set(['LSI', 'LDA']).intersection(transformations),
+        'preprocessing': preprocessings
+    }
+
+    for combination in itertools.product(*params.values()):
+        dict_comb = dict(zip(params.keys(), combination))
+        trans = dict_comb['transformation']
+        preproc = dict_comb['preprocessing']
+
+        mfile = local.transformation_model(trans, trans, preproc)
+        tfile = local.transformation_topics(trans, preproc)
+        tposfile = utils.change_extension(tfile, 'pos.json')
+
+        if os.path.exists(mfile):
+            logger.info("Get topics from '{}-{}' model".format(trans, preproc))
+
+            topics = Topics(trans, mfile)
+            topics.save(tfile, 50)
+            topics.save_positives(tposfile, 50)
+
+#=============================================
+# Transform data
+#=============================================
+
+if 'transform_data' in conf['execution']:
+
+    params = {
+        'transformation': transformations,
+        'preprocessing': preprocessings
+    }
+
+    for combination in itertools.product(*params.values()):
+        dict_comb = dict(zip(params.keys(), combination))
+        trans = dict_comb['transformation']
+        preproc = dict_comb['preprocessing']
+
+        # dictionary's file, tf-idf file, current transformation model's file
+        dict_file = local.dictionary(preproc)
+        tfidf_file = local.transformation_model('tfidf', trans, preproc)
+        trans_file = local.transformation_model(trans, trans, preproc)
+
+        if os.path.exists(dict_file) and os.path.exists(trans_file):
+
+            # load current transformation model
+            model = LoadTransformer(trans, trans_file)
+
+            sparams = {
+                'category': conf['classes'],
+                'subset': ['train', 'dev', 'test'],
+            }
+
+            for scombination in itertools.product(*sparams.values()):
+                sub_dict_comb = dict(zip(sparams.keys(), scombination))
+                category = sub_dict_comb['category']
+                subset = sub_dict_comb['subset']
+
+                logger.info(
+                    "Data transformation: '{}-{}' model on '{}-{}' corpus"
+                    .format(trans, preproc, category, subset))
+
+                # input: preprocessed data file; output: transformed data file
+                ifn = local.preprocessed_file(category, subset, preproc)
+                ofn = local.transformed_file(category, subset, trans, preproc)
+
+                timer.start_timer()
+                if trans == 'lda':
+                    model.store_transformation(ifn, ofn, dict_file, None)
+                else:
+                    model.store_transformation(ifn, ofn, dict_file, tfidf_file)
+                timer.stop_timer("{} transformed execution".format(trans))
+
+#=============================================
+# Train document classifiers
+#=============================================
+
+if 'train_classifiers' in conf['execution']:
+
+    for classif_name, options in classifiers.items():
+
+        params = {
+            'transformation':  transformations,
+            'preprocessing': preprocessings,
+            'classif_type': options['classif_types'],
+            'train_type': options['train_types'],
+            'chunk_size': options['chunk_sizes']
+        }
+
+        # optional initialization arguments for a given classifier
+        kwargs = options['kwargs'] if 'kwargs' in options else {}
+
+        for combination in itertools.product(*params.values()):
+            dict_comb = dict(zip(params.keys(), combination))
+            trans = dict_comb['transformation']
+            preproc = dict_comb['preprocessing']
+            classif_type = dict_comb['classif_type']
+            train_type = dict_comb['train_type']
+            chunk_size = dict_comb['chunk_size']
+
+            logger.info(
+                "Train classification model: {}-{}-{}-{}"
+                .format(classif_name, classif_type, train_type, chunk_size))
+
+            # set file names
+            train_files = local.transformed_files(trans, preproc, 'train')
+
+            model_file = local.classification_model(
+                trans, preproc,
+                classif_name, classif_type, train_type, chunk_size)
+
+            shape_file = utils.change_extension(model_file, 'json')
+
+            # initialize classifier
+            classifier = TrainClassifier(
+                classif_name, classif_type, conf['classes'], **kwargs)
+
+            # train classifier
+            classifier.train(train_type, train_files, chunk_size)
+
+            # save classifier
+            classifier.save(model_file)
+            classifier.save_shape(shape_file)
+
+#=============================================
+# Test document classifiers
+#=============================================
+
+if 'test_classifiers' in conf['execution']:
+
+    for classif_name, options in classifiers.items():
+
+        params = {
+            'transformation':  transformations,
+            'preprocessing': preprocessings,
+            'classif_type': options['classif_types'],
+            'train_type': options['train_types'],
+            'chunk_size': options['chunk_sizes']
+        }
+
+        for combination in itertools.product(*params.values()):
+            dict_comb = dict(zip(params.keys(), combination))
+            trans = dict_comb['transformation']
+            preproc = dict_comb['preprocessing']
+            classif_type = dict_comb['classif_type']
+            train_type = dict_comb['train_type']
+            chunk_size = dict_comb['chunk_size']
+
+            #-------------------------------------------
+            # set file names
+            #-------------------------------------------
+
+            model_file = local.classification_model(
+                trans, preproc,
+                classif_name, classif_type, train_type, chunk_size)
+
+            # own stats file (.json)
+            stats_file = local.stats_file(
+                classif_name, classif_type, train_type, chunk_size,
+                trans, preproc)
+
+            # roc & plot files
+            roc_file = utils.change_extension(stats_file, 'roc')
+            plot_file = utils.change_extension(stats_file, 'png')
+
+            #-------------------------------------------
+            # use and evaluate classifier
+            #-------------------------------------------
+
+            if os.path.exists(model_file):
+
+                # load classifier
+                classifier = LoadClassifier(model_file)
+
+                # classify documents and store predictions
+                for category in conf['classes']:
+
+                    ifn = local.transformed_file(
+                        category, 'test', trans, preproc)
+
+                    ofn = local.classified_file(
+                        category, 'test',
+                        classif_name, classif_type, train_type, chunk_size,
+                        trans, preproc)
+
+                    classifier.store_prediction(ifn, ofn)
+
+                # filenames of classified documents
+                test_files = local.classified_files(
+                    classif_name, classif_type, train_type, chunk_size,
+                    trans, preproc, 'test')
+
+                #-------------------------------------------
+                # compute own global statistics
+                #-------------------------------------------
+
+                sprediction = PredictionStatistics(test_files, conf['classes'])
+                sprediction.compute_stats()
+                sprediction.store_stats(stats_file)
+
+                #-------------------------------------------
+                # compute sklearn statistics
+                #-------------------------------------------
+
+                evaluation = EvalMetrics(test_files, conf['classes'])
+
+                # compute the global confusion matrix
+                evaluation.confusion_matrix()
+
+                # compute the acc, auc, roc curve for each category
+                evaluation.store_stats(roc_file, plot_file)
