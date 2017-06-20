@@ -94,8 +94,8 @@ class TransformerTest < Minitest::Unit::TestCase
 
     features = @transformer.transform_doc(@doc_sport)
 
-    features = features.split(' ').map{|x| '%.7f' % (x) }
-    real_features = real_features.map{|x| '%.7f' % (x) }
+    features.map!{|x| x.round(7) }
+    real_features.map!{|x| x.round(7) }
 
     assert_equal real_features, features
   end
@@ -155,8 +155,8 @@ class TransformerTest < Minitest::Unit::TestCase
 
     features = @transformer.transform_doc(@doc_non_sport)
 
-    features = features.split(' ').map{|x| '%.7f' % (x) }
-    real_features = real_features.map{|x| '%.7f' % (x) }
+    features.map!{|x| x.round(7) }
+    real_features.map!{|x| x.round(7) }
 
     assert_equal real_features, features
   end

@@ -105,9 +105,9 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
       freq[@dictionary[word]] += 1 if @dictionary.key?(word)
     end
 
-    return '' if freq.empty?
+    return [] if freq.empty?
 
-    # list of sorted ids
+    # list of word ids
     ids = freq.keys
 
     # compute TF-IDF features
@@ -127,7 +127,7 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
       end
     end
 
-    lsi_features.join(' ')
+    lsi_features
   end
 
   # compute the TF-IDF l2 norm on given weights
@@ -138,8 +138,7 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
     norm = Math.sqrt(norm)
 
     # normalize by norm
-    weights.map!{|weight| weight / norm }
-    weights
+    weights.map{|weight| weight / norm }
   end
 
   private :load_dict, :load_tfidf, :load_lsi, :normalize_weights
