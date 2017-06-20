@@ -50,26 +50,19 @@ class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
 
   # Predict class for a new document
   #
-  # @param doc [String] the list of features separated by spaces
+  # @param doc [Array] the list of float features
   # @return [Hash] the most likely class and the class probabilities
-  def classify_doc(doc='')
-    raise Xi::ML::Error::ConfigError, 'Method expects a String object'\
-      unless doc.is_a?(String)
-
+  def classify_doc(doc)
     { probas: predict_proba(doc), category: predict_class(doc) }
   end
 
   # Predict the class probabilities of the given document
   #
-  # @param doc [String] given document
+  # @param features [Array] given document's features
   # @return [Hash] the class => prob information
-  def predict_proba(doc)
+  def predict_proba(features)
     @probas = {}
-
-    return {} if doc.empty?
-
-    features = []
-    doc.split(' ').each {|x| features << x.to_f }
+    return {} if features.empty?
 
     raise Xi::ML::Error::DataError, \
       "Document must contain #{@conf['n_features']} features "\
@@ -130,7 +123,7 @@ class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
 
   # Predict the document's most likely class based on class probabilities
   #
-  # @param doc [String] given document
+  # @param doc [Array] given document's features
   # @return [String] the most likely class
   def predict_class(doc)
     predict_proba(doc) if @probas.empty?
