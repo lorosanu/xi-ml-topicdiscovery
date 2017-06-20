@@ -1,5 +1,12 @@
 # News
 
+## Xi-ML 0.5.0 - 20/06/2017
+* optimise code
+    - avoid useless 'join', 'split' calls
+        - method 'transform_doc' return an array of features (instead of String)
+        - method 'classify_doc' expects an array of features (instead of String)
+    - speed up the array multiplications in the MLP classifier lib
+
 ## Xi-ML 0.4.0 - 03/04/2017
 * update code
     - use stricter rules in the punctuation cleaner
