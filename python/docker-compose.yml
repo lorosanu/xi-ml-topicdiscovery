@@ -1,7 +1,8 @@
 ml:
   image: ml-python-devel
   volumes:
-  - /mnt/data/ml/resources/:/mnt/data/ml/resources/
+  - /mnt/data/ml/docs/:/mnt/data/ml/docs/
+  - /mnt/data/ml/colors/:/mnt/data/ml/colors/
 
 ml-devel:
   extends:
@@ -14,4 +15,5 @@ lab-ml-devel:
   extends:
     service: ml-devel
   volumes:
-  - /mnt/data0/ml/resources/:/mnt/data0/ml/resources/
+  - /mnt/data0/ml/docs/:/mnt/data0/ml/docs/
+  - /mnt/data0/ml/colors/:/mnt/data0/ml/colors/
