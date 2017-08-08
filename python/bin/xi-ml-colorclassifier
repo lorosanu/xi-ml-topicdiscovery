@@ -1,0 +1,118 @@
+#!/usr/bin/python3
+# -*-coding:utf-8 -*
+
+
+import logging
+import argparse
+
+import os
+import sys
+import yaml
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../lib'))
+sys.path.append(lib_path)
+
+from xi.ml.tools import utils
+from xi.ml.error import ConfigError, CaughtException
+from xi.ml.corpus import StreamCorpus
+from xi.ml.classify import TrainClassifier
+
+#=============================================
+# Parse the command line arguments
+#=============================================
+
+options = {}
+
+parser = argparse.ArgumentParser(
+    description='Train the color classifier')
+parser.add_argument('conf', help='input config file (yml)')
+options = parser.parse_args()
+
+# check config file existance
+if not os.path.isfile(options.conf):
+    raise ConfigError("Config file '{}' not found".format(options.conf))
+
+#=============================================
+# Logger setup
+#=============================================
+
+logger = logging.getLogger('xi.ml')
+
+# logger setup for gensim
+logging.basicConfig(
+    format='[%(name)s] [%(asctime)s] %(levelname)s : %(message)s',
+    level=logging.INFO)
+
+#=============================================
+# Load configuration
+#=============================================
+
+conf = {}
+
+with open(options.conf, 'r') as stream:
+    try:
+        conf = yaml.load(stream)
+    except yaml.YAMLError as exc:
+        raise CaughtException(
+            "Exception encountered during YAML load: {}".format(exc))
+
+if not isinstance(conf, dict):
+    raise ConfigError("Not a dict object stored in '{}'".format(options.conf))
+
+if not conf:
+    raise ConfigError("Empty configuration in '{}'".format(options.conf))
+
+#=============================================
+# Configuration checkups
+#=============================================
+
+for key in ['res', 'classes', 'train']:
+    if key not in conf:
+        raise ConfigError("Missing mandatory config option '{}'".format(key))
+
+for key in ['type', 'data', 'model', 'kwargs']:
+    if key not in conf['train']:
+        raise ConfigError(
+            "Missing mandatory config option train[{}]".format(key))
+
+for key in ['solver', 'activation', 'max_iter', 'hidden_layer_sizes']:
+    if key not in conf['train']['kwargs']:
+        raise ConfigError(
+            "Missing mandatory config option train[kwargs][{}]".format(key))
+
+if not os.path.isdir(conf['res']):
+    raise ConfigError("Data folder '{}' not found".format(conf['res']))
+
+#=============================================
+# Train color classifiers
+#=============================================
+
+model_type = conf['train']['type']
+kwargs = conf['train']['kwargs']
+
+data_file = os.path.join(conf['res'], conf['train']['data'])
+model_file = os.path.join(conf['res'], conf['train']['model'])
+shape_file = utils.change_extension(model_file, 'json')
+
+if not (os.path.exists(model_file) and os.path.exists(shape_file)):
+    logger.info('Train an MLP classifier model')
+    logger.info("Current configuration: {}".format(conf))
+
+    labels = []
+    features = []
+
+    sc = StreamCorpus(data_file)
+    for color in sc:
+        labels.append(color['category'])
+        features.append(color['features'])
+
+    # initialize classifier
+    classifier = TrainClassifier(
+        'MLPClassifier', model_type, conf['classes'], **kwargs)
+
+    # train classifier
+    classifier.classifier.train(features, labels, 'offline')
+
+    # save classifier
+    classifier.save(model_file)
+    classifier.save_shape(shape_file)

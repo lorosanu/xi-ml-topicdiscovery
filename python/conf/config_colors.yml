@@ -1,0 +1,25 @@
+res: /mnt/data/ml/colors/
+classes:
+  - white
+  - black
+  - gray
+  - red
+  - green
+  - blue
+  - cyan
+  - brown
+  - yellow
+  - orange
+  - pink
+  - purple
+train:
+  type: multilabel
+  data: features/updated/12colors/12colors_pixel_value_RGB_64x64.json
+  model: models/updated/12colors/sgd/relu/RGB/mlpclassifier_multilabel_1HL-100n_pixel_value_RGB_64x64.bin
+  kwargs:
+    verbose: True
+    solver: sgd
+    activation: relu
+    max_iter: 500
+    hidden_layer_sizes:
+      - 100
