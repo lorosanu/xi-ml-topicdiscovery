@@ -13,6 +13,7 @@ class Xi::ML::Corpus::StreamCorpus < Xi::ML::Tools::Component
   # @param input [String] the name of the input txt file
   def initialize(input)
     super()
+
     Xi::ML::Tools::Utils.check_file_readable!(input)
     @input = input
     @logger.info("Corpus will look into documents from '#{input}' file")
@@ -32,8 +33,7 @@ class Xi::ML::Corpus::StreamCorpus < Xi::ML::Tools::Component
       end
     rescue => e
       raise Xi::ML::Error::CaughtException, \
-        "Exception encountered when creating doc hash object: #{e.message}"
+        "Exception encountered when yielding doc object: #{e.message}"
     end
   end
-
 end
