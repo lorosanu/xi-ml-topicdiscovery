@@ -18,7 +18,7 @@ class Xi::ML::Tools::Logger
       logger = Log4r::Logger.new(name)
       logger.additive = false
       logger.level = Log4r::Logger[ROOT].level
-      logger.outputters = Log4r::Logger[ROOT].outputters.clone
+      logger.outputters = Log4r::Logger[ROOT].outputters.dup
     end
 
     Log4r::Logger[name]
@@ -41,7 +41,7 @@ class Xi::ML::Tools::Logger
     Log4r::Logger.each do |lname|
       if lname.start_with?(ROOT)
         Log4r::Logger[lname].level = logger.level
-        Log4r::Logger[lname].outputters = logger.outputters.clone
+        Log4r::Logger[lname].outputters = logger.outputters.dup
       end
     end
   end
