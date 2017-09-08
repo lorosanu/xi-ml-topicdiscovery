@@ -1,9 +1,8 @@
-:res: /mnt/data/ml/resources/
-:lang: fr
+:res: /mnt/data/ml/docs/resources/fr/3categories/ssu/
 :classes:
-  - society
-  - sport
-  - _UNK_
+  - :society
+  - :sport
+  - :_UNK_
 :execution:
   - :extract
   - :build
@@ -21,18 +20,19 @@
     :type:
       - content
     :source:
-      - id
-      - lang
-      - site
-      - url
-      - title
-      - content
+      - :id
+      - :lang
+      - :site
+      - :url
+      - :title
+      - :content
     :min_nchars: 200
   :hosts:
-    society: ./conf/fr/hosts_3classes/society_hosts.yml
-    sport: ./conf/fr/hosts_3classes/sport_hosts.yml
-    _UNK_: ./conf/fr/hosts_3classes/unk_hosts.yml
-  :query_filter: url-regexp
+    :society: ./conf/fr/hosts_3classes/society_hosts.yml
+    :sport: ./conf/fr/hosts_3classes/sport_hosts.yml
+    :_UNK_: ./conf/fr/hosts_3classes/unk_hosts.yml
+  :lang: :fr
+  :query_filter: :url_regexp
 :build:
   :division:
     :train: 80
@@ -44,8 +44,6 @@
       - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
         :args:
       - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
-        :args:
-      - :name: Xi::ML::Preprocess::Cleaner::UpcaseCleaner
         :args:
       - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
         :args:

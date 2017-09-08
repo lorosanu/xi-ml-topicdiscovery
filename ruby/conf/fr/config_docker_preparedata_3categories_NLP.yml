@@ -1,24 +1,21 @@
-:res: /mnt/data/ml/resources/
-:version: es1preprod_22022017
-:lang: fr
+:res: /mnt/data/ml/docs/resources/fr/3categories/ssu/
+:version: es1prod_06102017
 :classes:
-  - society
-  - sport
-  - _UNK_
+  - :society
+  - :sport
+  - :_UNK_
 :execution:
   - :clean
 :clean:
   :preprocs:
-    :NV-PDLW:
-      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
-        :args:
-      - :name: Xi::ML::Preprocess::Cleaner::UpcaseCleaner
-        :args:
+    :LNV-PDLW:
       - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
         :args:
           :lang: fr
-          :filter: Xi::ML::Preprocess::Filter::PosNVFilter
+          :filter: Xi::ML::Preprocess::Filter::PosNVLemmasFilter
       - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
         :args:
       - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
         :args:

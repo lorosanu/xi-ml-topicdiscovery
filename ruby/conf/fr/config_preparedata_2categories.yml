@@ -1,8 +1,7 @@
-:res: /mnt/data/ml/resources/
-:lang: fr
+:res: /mnt/data/ml/docs/resources/fr/2categories/sn/
 :classes:
-  - sport
-  - non-sport
+  - :sport
+  - :non-sport
 :execution:
   - :extract
   - :build
@@ -20,17 +19,18 @@
     :type:
       - content
     :source:
-      - id
-      - lang
-      - site
-      - url
-      - title
-      - content
+      - :id
+      - :lang
+      - :site
+      - :url
+      - :title
+      - :content
     :min_nchars: 200
   :hosts:
-    sport: ./conf/fr/hosts_2classes/sport_hosts.yml
-    non-sport: ./conf/fr/hosts_2classes/non-sport_hosts.yml
-  :query_filter: host
+    :sport: ./conf/fr/hosts_2classes/sport_hosts.yml
+    :non-sport: ./conf/fr/hosts_2classes/non-sport_hosts.yml
+  :lang: :fr
+  :query_filter: :url_regexp
 :build:
   :division:
     :train: 80
@@ -42,8 +42,6 @@
       - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
         :args:
       - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
-        :args:
-      - :name: Xi::ML::Preprocess::Cleaner::UpcaseCleaner
         :args:
       - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
         :args:
