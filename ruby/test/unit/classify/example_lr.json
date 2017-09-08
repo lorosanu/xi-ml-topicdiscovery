@@ -4,7 +4,7 @@
   "n_features": 300,
   "classes": ["non-sport", "sport"],
   "intercept": [1.2023951481002335],
-  "coefs": [
+  "coeffs": [
     [
       -8.188120224778277,
       -51.15506155113028,

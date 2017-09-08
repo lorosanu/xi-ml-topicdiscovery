@@ -8,27 +8,28 @@ class Xi::ML::Transform::Transformer < Xi::ML::Tools::Component
   attr_reader :name, :model
 
   TRANSFORMERS = {
-    'LSI' => Xi::ML::Transform::LSITransformer
+    LSI: Xi::ML::Transform::LSITransformer
   }.freeze
 
   # Initialize the transformer
   #
-  # @param trans_name [String] the name of the transformation model
+  # @param trans_name [Symbol] the name of the transformation model
   # @param trans_files [Hash] the files needed for the transformation
   def initialize(trans_name, trans_files)
     super()
 
     raise Xi::ML::Error::ConfigError, \
-      "Unknown model '#{trans_name}'. Choose from #{TRANSFORMERS}" \
-      unless TRANSFORMERS.include?(trans_name.upcase)
+      "Unknown model name '#{trans_name}'. Choose from #{TRANSFORMERS.keys}" \
+      unless TRANSFORMERS.key?(trans_name)
 
-    @name = trans_name.upcase
+    @name = trans_name
     @model = TRANSFORMERS[@name].new(trans_files)
   end
 
   # Transform the given document into the given format
   #
   # @param text [String] the document's content
+  # @return [Array] the document's features
   def transform_doc(text)
     @model.transform_doc(text)
   end
@@ -44,8 +45,7 @@ class Xi::ML::Transform::Transformer < Xi::ML::Tools::Component
     @logger.info("Processing documents from '#{data_file}'")
 
     sc = Xi::ML::Corpus::StreamCorpus.new(data_file)
-    pc = Xi::ML::Corpus::PushCorpus.new(output_file,
-      %w[id url title content category features])
+    pc = Xi::ML::Corpus::PushCorpus.new(output_file)
 
     sc.each_doc do |doc|
       if doc['content']

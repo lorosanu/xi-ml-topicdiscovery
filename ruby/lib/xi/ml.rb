@@ -13,7 +13,7 @@ require 'log4r'
 require 'elasticsearch'
 require 'socket'
 require 'timeout'
-require 'narray'            # lib for dot product
+require 'numo/narray'       # lib for dot product
 
 module Xi
   module ML

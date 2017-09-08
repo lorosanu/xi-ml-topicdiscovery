@@ -17,10 +17,10 @@ class ClassifierTest < Minitest::Unit::TestCase
     Xi::ML::Tools::Utils.check_file_readable!(mlp_file)
 
     @lr_classifier = Xi::ML::Classify::Classifier.new(
-      'LogisticRegression', lr_file)
+      :LogisticRegression, lr_file)
 
     @mlp_classifier = Xi::ML::Classify::Classifier.new(
-      'MLPClassifier', mlp_file)
+      :MLPClassifier, mlp_file)
 
     sport_file = File.join(File.dirname(__FILE__), 'feat_sport.txt')
     nonsport_file = File.join(File.dirname(__FILE__), 'feat_non-sport.txt')
