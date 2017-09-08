@@ -1,0 +1,67 @@
+#!/usr/bin/ruby
+# encoding: utf-8
+
+
+require 'optparse'
+
+$LOAD_PATH.unshift 'lib/'
+require 'xi/ml'
+
+
+#======================================================================
+# Setup loggers level
+#======================================================================
+
+Xi::ML::Tools::Logger.global_level = Log4r::INFO
+
+
+#======================================================================
+# Parse the command line arguments
+#======================================================================
+
+@options = {}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Object: convert LSI model (.json => .bin / .bin => json)\n"
+  opts.banner << 'Usage: ./bin/xi-ml-convertmodel [options]'
+
+  opts.on('-i INPUT', '--input INPUT', 'Input file') {|v| @options[:input] = v }
+  opts.on('-o OUT', '--output OUT', 'Output file') {|v| @options[:output] = v }
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+begin
+  parser.parse!
+  abort "[Error] Empty argument(s)\n\n#{parser}" \
+    if @options[:input].nil? || @options[:output].nil?
+rescue OptionParser::InvalidOption => e1
+  abort "[Error] #{e1.message.capitalize}\n\n#{parser}"
+rescue OptionParser::MissingArgument => e2
+  abort "[Error] #{e2.message.capitalize}\n\n#{parser}"
+end
+
+Xi::ML::Tools::Utils.check_file_readable!(@options[:input])
+Xi::ML::Tools::Utils.create_path(@options[:output])
+
+
+#======================================================================
+# Convert model
+#======================================================================
+
+file_extension = Xi::ML::Tools::Utils.extname(@options[:input])
+
+if file_extension == '.json'
+  Xi::ML.logger.info('Convert model from json format to binary format')
+  Xi::ML::Tools::ModelBinarizer.convert(@options[:input], @options[:output])
+end
+
+if file_extension == '.bin'
+  Xi::ML.logger.info('Convert model from binary format to json format')
+  model = Xi::ML::Tools::ModelBinarizer.revert(@options[:input])
+  File.open(@options[:output], 'w') do |of|
+    model.each{|weights| of.puts(weights.to_json) }
+  end
+end
