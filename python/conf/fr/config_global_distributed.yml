@@ -1,0 +1,16 @@
+res: /mnt/data/ml/docs/resources/fr/1category/g/es1prod_25092017/
+classes:
+  - global
+preprocessings:
+  - PDLW
+dictionary:
+  no_below: 5
+  no_above: 0.75
+  keep_n: 500000
+transformations:
+  LSI:
+    num_topics: 300
+    distributed: True
+execution:
+  - train_trans
+  - get_topics

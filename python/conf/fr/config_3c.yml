@@ -1,7 +1,8 @@
-res: /mnt/data/ml/docs/resources/fr/2categories/sn/es1preprod_24102016/
+res: /mnt/data/ml/docs/resources/fr/3categories/ssu/es1prod_06102017/
 classes:
+  - society
   - sport
-  - non-sport
+  - _UNK_
 preprocessings:
   - PDLW
 dictionary:
@@ -13,21 +14,6 @@ transformations:
     num_topics: 300
     distributed: False
 classifiers:
-  LogisticRegression:
-    classif_types:
-      - multiclass
-    train_types:
-      - offline
-    chunk_sizes:
-      - -1
-      - 1000
-      - 10000
-      - 100000
-      - 1000000
-    kwargs:
-      penalty: l2
-      solver: liblinear
-      max_iter: 100
   MLPClassifier:
     classif_types:
       - multiclass

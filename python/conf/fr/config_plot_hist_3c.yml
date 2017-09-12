@@ -1,7 +1,7 @@
-res: /mnt/data/ml/docs/resources/fr/es1preprod_22022017/
+res: /mnt/data/ml/docs/resources/fr/3categories/ssu/es1prod_06102017/
 input:
-  - data/sport/transformed/LSI_PDLW/sport_train.json
   - data/society/transformed/LSI_PDLW/society_train.json
+  - data/sport/transformed/LSI_PDLW/sport_train.json
   - data/_UNK_/transformed/LSI_PDLW/_UNK__train.json
 output: plots/histogram/
 features:
