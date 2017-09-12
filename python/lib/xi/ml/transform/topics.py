@@ -6,6 +6,7 @@ import json
 
 from gensim.models import LsiModel, LdaModel
 
+from xi.ml.tools import utils
 from xi.ml.common import Component
 from xi.ml.error import ConfigError
 
@@ -51,6 +52,7 @@ class Topics(Component):
             if words:
                 wtopics.append(words)
 
+        utils.create_path(output)
         with open(output, 'w') as ostream:
             json.dump(wtopics, ostream, ensure_ascii=False, indent=2)
 
