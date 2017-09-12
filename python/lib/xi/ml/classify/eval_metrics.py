@@ -10,6 +10,10 @@ from xi.ml.common import Component
 from xi.ml.tools import utils
 from xi.ml.corpus import StreamCorpus
 
+def percentage(x):
+    """Convert decimal to percentage. Return a string"""
+    return "{:.2f}".format(x * 100)
+
 class EvalMetrics(Component):
     """
     Class using the sklearn metrics lib to evaluate a classifier's performance
@@ -98,11 +102,17 @@ class EvalMetrics(Component):
         Plot the ROC curve (FP/TP) on each category tag.
         """
 
+        # length of longest category name
+        nmax = max(len(cat) for cat in self.categories)
+
+        # stats header inside generated plots
+        header = "{} {:>6} {:>6} {:>6} {:>6}".format(
+            ' ' * nmax, 'P', 'R', 'Acc', 'AUC')
+
         utils.create_path(roc_file)
         utils.create_path(plot_file)
 
         roc = {}
-
         _, fig = pylab.subplots()
 
         for index, category in enumerate(self.categories):
@@ -141,15 +151,25 @@ class EvalMetrics(Component):
                         pred_labels.append(pred_cat)
                         pred_probas.append(pred_proba)
 
+            prec = sklearn.metrics.precision_score(true_labels, pred_labels)
+            recall = sklearn.metrics.recall_score(true_labels, pred_labels)
             acc = sklearn.metrics.accuracy_score(true_labels, pred_labels)
+
             cm = sklearn.metrics.confusion_matrix(true_labels, pred_labels)
             rep = sklearn.metrics.classification_report(
                 true_labels, pred_labels)
             auc = sklearn.metrics.roc_auc_score(true_labels, pred_probas)
 
-            self.logger.info("Category: {}".format(category))
-            self.logger.info("Acc: {}".format(acc))
-            self.logger.info("AUC: {}".format(auc))
+            prec = percentage(prec)
+            recall = percentage(recall)
+            acc = percentage(acc)
+            auc = percentage(auc)
+
+            self.logger.info("Category:  {}".format(category))
+            self.logger.info("Precision: {}%".format(prec))
+            self.logger.info("Recall:    {}%".format(recall))
+            self.logger.info("Accuracy:  {}%".format(acc))
+            self.logger.info("AUC:       {}%".format(auc))
             self.logger.info("Confusion-matrix:\n{}".format(cm))
             self.logger.info("Report:\n{}".format(rep))
 
@@ -168,10 +188,12 @@ class EvalMetrics(Component):
             # plot current ROC curve
             fig.plot(fpr, tpr, label=category)
 
-            # annotate current Accuracy & AUC scores
+            # annotate current precision, recall, accuracy and AUC scores
+            cdisplay = category.rjust(nmax)
+            fig.annotate(header, (0.4, 0.67), size=9, family='monospace')
             fig.annotate(
-                "{} : {:.2f}, {:.2f}".format(category, acc * 100, auc * 100),
-                (0.6, 0.7 - 0.15 * index), size=12)
+                "{}  {}  {}  {}  {}".format(cdisplay, prec, recall, acc, auc),
+                (0.4, 0.6 - 0.07 * index), size=9, family='monospace')
 
         fig.legend(labels=self.categories)
 
@@ -180,6 +202,7 @@ class EvalMetrics(Component):
         pylab.ylabel('True positive rate')
 
         pylab.savefig(plot_file)
+        pylab.close()
         self.logger.info("Plot saved under {} file".format(plot_file))
 
         # save ROC values to file
