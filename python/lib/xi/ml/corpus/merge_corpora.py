@@ -52,6 +52,7 @@ class MergeCorpora(Component):
 
         # count the number of documents in each file
         self.ndocs = [count_file_lines(fn) for fn in input_files]
+        self.logger.info("Available data for training: {}".format(self.ndocs))
 
         # create one generator for each input file
         # => return one document at a time from each input file
