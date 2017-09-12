@@ -28,52 +28,57 @@ class PredictionStatistics(Component):
 
         self.stats = {}
 
-        gc, gt = 0, 0
-        n_correct, n_total = {}, {}
+        tp, fn, fp, tn = {}, {}, {}, {}
+        n_total, n_incorrect = {}, {}
 
         # init stats dictionary
         # - number of total documents in class 'category'
         # - number of correctly classified documents in class 'category'
         for category in self.categories:
+            tp[category] = 0
+            fn[category] = 0
+            fp[category] = 0
+            tn[category] = 0
             n_total[category] = 0
-            n_correct[category] = 0
+            n_incorrect[category] = 0
 
         # count correct predictions in given data files
-        valid_format = False
-
         for input_file in self.data_files:
             sc = StreamCorpus(input_file)
 
             for doc in sc:
-                if 'category' in doc and 'season' in doc:
-                    valid_format = True
+                if 'category' not in doc or 'season' not in doc:
+                    continue
 
-                    real_categories = doc['category']
-                    predicted_categories = doc['season']
+                real_categories = doc['category']
+                predicted_categories = doc['season']
 
-                    # convert real_category to list
-                    if isinstance(real_categories, str):
-                        real_categories = [real_categories]
+                # convert real_category to list
+                if isinstance(real_categories, str):
+                    real_categories = [real_categories]
 
-                    # convert predicted_category to list
-                    if isinstance(predicted_categories, str):
-                        predicted_categories = [predicted_categories]
+                # convert predicted_category to list
+                if isinstance(predicted_categories, str):
+                    predicted_categories = [predicted_categories]
 
-                    for real_category in real_categories:
-                        n_total[real_category] += 1
-                        if real_category in predicted_categories:
-                            n_correct[real_category] += 1
+                for real_category in real_categories:
+                    n_total[real_category] += 1
 
+                    if real_category in predicted_categories:
+                        tp[real_category] += 1
+                    else:
+                        for predicted_category in predicted_categories:
+                            fp[predicted_category] += 1
 
-        if not valid_format:
-            self.logger.warning(
-                "Input data has no fields 'category' or 'season'")
+        if sum(n_total.values()) == 0:
+            self.logger.warning('No data to process')
             return
 
         # print stats by class
+        gc, gt = 0, 0
         for category in self.categories:
             total = n_total[category]
-            correct = n_correct[category]
+            correct = tp[category]
             avg_accuracy = self.div(correct, total)
 
             self.logger.info(
@@ -96,20 +101,9 @@ class PredictionStatistics(Component):
         # recall & precision stats for each class
         # true-positive, false-negative, false-positive, true-negative ratios
         recall, precision = {}, {}
-        tp, fn, fp, tn = {}, {}, {}, {}
-
-        for i, category in enumerate(self.categories):
-            tp[category] = n_correct[category]
-            fn[category] = n_total[category] - n_correct[category]
-
-            tn[category] = 0
-            fp[category] = 0
-            for j, category_j in enumerate(self.categories):
-                if j != i:
-                    tn[category] += n_correct[category_j]
-                    fp[category] += (
-                        n_total[category_j] -
-                        n_correct[category_j])
+        for category in self.categories:
+            fn[category] = n_total[category] - tp[category]
+            tn[category] = gt - tp[category] - fn[category] - fp[category]
 
             precision[category] = self.div(
                 tp[category], tp[category] + fp[category])
@@ -158,6 +152,7 @@ class PredictionStatistics(Component):
             "Save statistics on predictions to '{}'"
             .format(output))
 
+        utils.create_path(output)
         with open(output, 'w') as ostream:
             ostream.write(json.dumps(self.stats, indent=2))
 
