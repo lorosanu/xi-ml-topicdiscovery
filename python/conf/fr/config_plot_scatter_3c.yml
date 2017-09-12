@@ -1,0 +1,27 @@
+res: /mnt/data/ml/docs/resources/fr/es1preprod_22022017/
+input:
+  - data/sport/transformed/LSI_PDLW/sport_train.json
+  - data/society/transformed/LSI_PDLW/society_train.json
+  - data/_UNK_/transformed/LSI_PDLW/_UNK__train.json
+output: plots/scatterplot/
+features:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+labels:
+  - topic1
+  - topic2
+  - topic3
+  - topic4
+  - topic5
+optplot:
+  type: scatter
+  kwargs:
+    alpha: 0.8
+    s: 10
+optfig:
+  size:
+    - 7
+    - 7

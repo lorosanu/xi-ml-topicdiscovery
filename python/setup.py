@@ -31,6 +31,7 @@ setup(
         'bin/xi-ml-processdemands',
         'bin/xi-ml-trainword2vec',
         'bin/xi-ml-colorclassifier',
+        'bin/xi-ml-plotdrawer',
     ],
 
     classifiers=[

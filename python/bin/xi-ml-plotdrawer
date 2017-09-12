@@ -1,0 +1,231 @@
+#!/usr/bin/python3
+# -*-coding:utf-8 -*
+
+
+import logging
+import argparse
+import json
+
+import os
+import sys
+import yaml
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../lib'))
+sys.path.append(lib_path)
+
+from xi.ml.tools import utils
+from xi.ml.corpus import StreamCorpus
+
+#=============================================
+# Parse the command line arguments
+#=============================================
+
+options = {}
+
+parser = argparse.ArgumentParser(
+    description='Draw frequency-histograms/scatter-plots on document features')
+parser.add_argument('conf', help='input config file (yml)')
+options = parser.parse_args()
+
+# check config file existance
+utils.check_file_readable(options.conf)
+
+#=============================================
+# Logger setup
+#=============================================
+
+logger = logging.getLogger('xi.ml')
+
+# logger setup for gensim
+logging.basicConfig(
+    format='[%(name)s] [%(asctime)s] %(levelname)s : %(message)s',
+    level=logging.INFO)
+
+#=============================================
+# Load configuration
+#=============================================
+
+conf = {}
+
+with open(options.conf, 'r') as stream:
+    try:
+        conf = yaml.load(stream)
+    except yaml.YAMLError as exc:
+        raise CaughtException(
+            "Exception encountered during YAML load: {}".format(exc))
+
+if not isinstance(conf, dict):
+    raise ConfigError("Not a dict object stored in '{}'".format(options.conf))
+
+if not conf:
+    raise ConfigError("Empty configuration in '{}'".format(options.conf))
+
+#=============================================
+# Configuration checkups
+#=============================================
+
+for key in ['res', 'input', 'features', 'optplot', 'optfig', 'output']:
+    if key not in conf:
+        raise ConfigError("Missing mandatory config option '{}'".format(key))
+
+if not isinstance(conf['features'], list):
+    raise ConfigError('Config option \'features\' not of type list')
+
+if not isinstance(conf['labels'], list):
+    raise ConfigError('Config option \'labels\' not of type list')
+
+if len(conf['features']) != len(conf['labels']):
+    raise ConfigError(
+        'Config options \'features\' and \'labels\' not of equal size')
+
+for key in ['type', 'kwargs']:
+    if key not in conf['optplot']:
+        raise ConfigError("Missing config option optplot['{}']".format(key))
+
+if 'size' not in conf['optfig']:
+    raise ConfigError("Missing config option optfig['size']")
+
+utils.check_folder_readable(conf['res'])
+data_files = [os.path.join(conf['res'], inputf) for inputf in conf['input']]
+
+output_folder = os.path.join(conf['res'], conf['output'])
+utils.create_folder(output_folder)
+
+optplot = conf['optplot']
+optfig = conf['optfig']
+
+feat_indexes = conf['features']
+feat_labels = conf['labels']
+
+#=============================================
+# Load data
+#=============================================
+
+logger.info("Load data from {}".format(data_files))
+
+ranges = {}
+for flabel in feat_labels:
+    ranges[flabel] = {'min': sys.float_info.max, 'max': sys.float_info.min}
+
+categories = []
+values = {}
+
+for data_file in data_files:
+    sc = StreamCorpus(data_file)
+    for entry in sc:
+        if 'category' in entry and 'features' in entry:
+            category = str(entry['category'])
+            feat = entry['features']
+
+            if category not in categories:
+                categories.append(category)
+
+            for findex, flabel in zip(feat_indexes, feat_labels):
+                if isinstance(feat, list) and len(feat) > findex:
+                    value = feat[findex]
+
+                    if flabel not in values:
+                        values[flabel] = {}
+
+                    if category not in values[flabel]:
+                        values[flabel][category] = []
+
+                    values[flabel][category].append(value)
+
+                    if value < ranges[flabel]['min']:
+                        ranges[flabel]['min'] = value
+
+                    if value > ranges[flabel]['max']:
+                        ranges[flabel]['max'] = value
+
+for flabel in feat_labels:
+    if flabel in ranges:
+        logger.info("{} has values in range [{}, {}]".format(
+            flabel, ranges[flabel]['min'], ranges[flabel]['max']))
+
+#=============================================
+# Plot type == histogram
+#=============================================
+
+if optplot['type'] == 'histogram':
+    logger.info('Processing histogram requests')
+    kwargs = optplot['kwargs']
+
+    # draw one histogram per feature-label
+    for flabel in feat_labels:
+        if flabel in values:
+            output_png = os.path.join(output_folder, "{}.png".format(flabel))
+            utils.create_path(output_png)
+
+            logger.info("Saving histograms into {}".format(output_png))
+
+            # update options for plot and histogram
+            nrows = 1
+            ncols = len(categories)
+            if not 'range' in kwargs:
+                kwargs['range'] = [ranges[flabel]['min'], ranges[flabel]['max']]
+
+            fig, a = plt.subplots(nrows, ncols, figsize=optfig['size'])
+            a = a.ravel()
+            for index, ax in enumerate(a):
+                cvalues = values[flabel][categories[index]]
+
+                # add weights: output correct percentages between [0, 100]
+                cweights = np.ones_like(cvalues) / len(cvalues) * 100
+
+                ax.set_title(categories[index])
+                ax.set_xlabel(flabel)
+                ax.set_ylabel('frequency')
+                ax.hist(cvalues, weights=cweights, **kwargs)
+
+                # set yrange [0, 100] for every category and every label
+                x1, x2, y1, y2 = ax.axis()
+                ax.axis((x1, x2, 0, 100))
+
+            plt.tight_layout()
+            plt.savefig(output_png)
+            plt.close(fig)
+
+#=============================================
+# Plot type == scatter
+#=============================================
+
+if optplot['type'] == 'scatter':
+    logger.info('Processing scatter-plots requests')
+    kwargs = optplot['kwargs']
+
+    feat_mix = []
+    for i in range(0, len(feat_labels)):
+        for j in range(i + 1, len(conf['features'])):
+            feat_mix.append((feat_labels[i], feat_labels[j]))
+
+    # draw one scatterplot per feature-mix
+    for flabel1, flabel2 in feat_mix:
+        lmix = "{}-{}".format(flabel1, flabel2)
+
+        if flabel1 in values and flabel2 in values:
+            output_png = os.path.join(output_folder, "{}.png".format(lmix))
+            utils.create_path(output_png)
+
+            logger.info("Saving scatter plots into {}".format(output_png))
+
+            plt.rcParams['figure.figsize'] = optfig['size']
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+
+            for index, category in enumerate(categories):
+                x = values[flabel1][category]
+                y = values[flabel2][category]
+
+                ax.set_title(lmix)
+                ax.set_xlabel(flabel1)
+                ax.set_ylabel(flabel2)
+                ax.scatter(x, y, label=category, **kwargs)
+
+            plt.legend(categories)
+            plt.tight_layout()
+            plt.savefig(output_png)
+            plt.close(fig)
