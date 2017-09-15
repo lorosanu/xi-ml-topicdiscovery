@@ -1,8 +1,7 @@
 ml:
   image: ml-python-devel
   volumes:
-  - /mnt/data/ml/docs/:/mnt/data/ml/docs/
-  - /mnt/data/ml/colors/:/mnt/data/ml/colors/
+  - /mnt/data/ml/:/mnt/data/ml/
 
 ml-devel:
   extends:
@@ -14,6 +13,6 @@ ml-devel:
 lab-ml-devel:
   extends:
     service: ml-devel
+  net: host
   volumes:
-  - /mnt/data0/ml/docs/:/mnt/data0/ml/docs/
-  - /mnt/data0/ml/colors/:/mnt/data0/ml/colors/
+  - /mnt/data0/ml/:/mnt/data0/ml/

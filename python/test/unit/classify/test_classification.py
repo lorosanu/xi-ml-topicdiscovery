@@ -136,7 +136,11 @@ class ClassifierTest(unittest.TestCase):
             }
         }
 
-        self.assertEqual(rprobas, probas)
+        self.assertEqual(rprobas['category'], probas['category'])
+
+        for field, value in rprobas['probas'].items():
+            self.assertIn(field, probas['probas'])
+            self.assertAlmostEqual(value, probas['probas'][field], places=7)
 
     def test_mlp(self):
         """Test the MLP's predicted class"""
@@ -150,4 +154,8 @@ class ClassifierTest(unittest.TestCase):
             }
         }
 
-        self.assertEqual(rprobas, probas)
+        self.assertEqual(rprobas['category'], probas['category'])
+
+        for field, value in rprobas['probas'].items():
+            self.assertIn(field, probas['probas'])
+            self.assertAlmostEqual(value, probas['probas'][field], places=7)
