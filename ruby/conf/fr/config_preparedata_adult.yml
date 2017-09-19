@@ -1,0 +1,49 @@
+:res: /mnt/data/ml/docs/resources/fr/1category/a/
+:classes:
+  - :adult
+:execution:
+  - :extract
+  - :build
+  - :clean
+:extract:
+  :es:
+    :name: lab09
+    :ip: localhost
+    :host: localhost
+    :port: '9200'
+  :esquery:
+    :index:
+      - article
+      - product
+    :type:
+      - content
+    :source:
+      - :id
+      - :site
+      - :url
+      - :lang
+      - :title
+      - :description
+      - :keywords
+      - :content
+    :min_nchars: 200
+  :hosts:
+     :adult: ./conf/fr/hosts_adult/adult_hosts.yml
+  :lang: :fr
+  :query_filter: :url_regexp
+:build:
+  :division:
+    :train: 80
+    :dev: 10
+    :test: 10
+:clean:
+  :preprocs:
+    :PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:

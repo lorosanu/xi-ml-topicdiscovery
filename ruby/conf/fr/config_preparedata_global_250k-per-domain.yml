@@ -1,0 +1,51 @@
+:res: /mnt/data/ml/docs/resources/fr/1category/g/
+:classes:
+  - :global
+:execution:
+  - :extract
+:extract:
+  :es:
+    :name: es1prod
+    :ip: localhost
+    :host: localhost
+    :port: '9225'
+  :esquery:
+    :index:
+      - article
+      - product
+      - video
+      - image
+      - home
+    :type:
+      - content
+    :source:
+      - :id
+      - :site
+      - :url
+      - :lang
+      - :title
+      - :description
+      - :keywords
+      - :content
+    :min_nchars: 200
+    :limit: 250000
+  :hosts:
+     :global: ./conf/fr/hosts_global/global_hosts.yml
+  :lang: :fr
+  :query_filter: :url_regexp
+:build:
+  :division:
+    :train: 100
+    :dev: 0
+    :test: 0
+:clean:
+  :preprocs:
+    :PDLW:
+      - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+        :args:
+      - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+        :args:
