@@ -17,17 +17,17 @@ class QueryTest < Minitest::Unit::TestCase
   end
 
   def test_rules_host
-    @query = Xi::ML::Extract::Query.new(@file.path, 'fr', 'host')
+    @query = Xi::ML::Extract::Query.new(@file.path, :fr, :host)
 
     rules = '{ query: { query_string: { query: "lang:fr AND '\
       + '( (site:www AND site:lequipe AND site:fr) '\
       + 'OR (site:www AND site:sports AND site:fr) )" } } }'
 
-    assert_equal rules, @query.to_s
+    assert_equal [rules], @query.rules
   end
 
   def test_rules_url_qs
-    @query = Xi::ML::Extract::Query.new(@file.path, 'fr', 'url-qs')
+    @query = Xi::ML::Extract::Query.new(@file.path, :fr, :url_querystring)
 
     rules = '{ query: { query_string: { query: "lang:fr AND '\
       + '( url:http\\\\:\\\\/\\\\/lequipe.fr\\\\/* OR '\
@@ -39,11 +39,11 @@ class QueryTest < Minitest::Unit::TestCase
       + 'url:https\\\\:\\\\/\\\\/sports.fr\\\\/* OR '\
       + 'url:https\\\\:\\\\/\\\\/www.sports.fr\\\\/* )" } } }'
 
-    assert_equal rules, @query.to_s
+    assert_equal [rules], @query.rules
   end
 
   def test_rules_url_prefix
-    @query = Xi::ML::Extract::Query.new(@file.path, 'fr', 'url-prefix')
+    @query = Xi::ML::Extract::Query.new(@file.path, :fr, :url_prefix)
 
     rules = '{ query: { filtered: { '\
       + 'query: { bool: { should: [ '\
@@ -59,11 +59,11 @@ class QueryTest < Minitest::Unit::TestCase
       + 'filter: { term: { lang: "fr" } } '\
       + '} } }'
 
-    assert_equal rules, @query.to_s
+    assert_equal [rules], @query.rules
   end
 
   def test_rules_url_regexp
-    @query = Xi::ML::Extract::Query.new(@file.path, 'fr', 'url-regexp')
+    @query = Xi::ML::Extract::Query.new(@file.path, :fr, :url_regexp)
 
     rules = '{ query: { filtered: { '\
       + 'query: { bool: { should: [ '\
@@ -73,7 +73,7 @@ class QueryTest < Minitest::Unit::TestCase
       + 'filter: { term: { lang: "fr" } } '\
       + '} } }'
 
-    assert_equal rules, @query.to_s
+    assert_equal [rules], @query.rules
   end
 
   def teardown
