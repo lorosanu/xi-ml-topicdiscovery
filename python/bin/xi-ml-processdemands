@@ -14,6 +14,7 @@ lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../lib'))
 sys.path.append(lib_path)
 
 from xi.ml.common import Timer
+from xi.ml.error import ConfigError, CaughtException
 from xi.ml.tools import utils, PathGenerator
 from xi.ml.corpus import dictionary, pickler, LoadCorpora
 from xi.ml.transform import TrainTransformer, LoadTransformer, Topics
@@ -33,7 +34,7 @@ options = parser.parse_args()
 
 # check config file existance
 if not os.path.isfile(options.conf):
-    exit("[Error] Config file '{}' not found".format(options.conf))
+    raise ConfigError("Config file '{}' not found".format(options.conf))
 
 #=============================================
 # Logger setup
@@ -56,13 +57,14 @@ with open(options.conf, 'r') as stream:
     try:
         conf = yaml.load(stream)
     except yaml.YAMLError as exc:
-        exit("[Error] Exception encountered during YAML load: {}".format(exc))
+        raise CaughtException(
+            "Exception encountered during YAML load: {}".format(exc))
 
 if not isinstance(conf, dict):
-    exit("[Error] Not a dict object stored in '{}'".format(options.conf))
+    raise ConfigError("Not a dict object stored in '{}'".format(options.conf))
 
 if not conf:
-    exit("[Error] Empty configuration in '{}'".format(options.conf))
+    raise ConfigError("Empty configuration in '{}'".format(options.conf))
 
 #=============================================
 # Configuration checkups
@@ -70,12 +72,17 @@ if not conf:
 
 for key in ['classes', 'res', 'execution']:
     if key not in conf:
-        exit("[Error] Missing mandatory config option '{}'".format(key))
+        raise ConfigError("Missing mandatory config option '{}'".format(key))
 
 if not os.path.isdir(conf['res']):
-    exit("[Error] Data folder '{}' not found".format(conf['res']))
+    raise ConfigError("Data folder '{}' not found".format(conf['res']))
 
 logger.info("Current configuration: {}".format(conf))
+
+# set default filter for the word dictionary
+filter_dict = { 'no_below': 5, 'no_above': 0.75, 'keep_n': 500000 }
+if 'dictionary' in conf and isinstance(conf['dictionary'], dict):
+    filter_dict = dict(conf['dictionary'])
 
 #=============================================
 # Set local ressources configuration
@@ -84,13 +91,15 @@ logger.info("Current configuration: {}".format(conf))
 # - ...
 #=============================================
 
-preprocessings = conf['preprocessings'] if 'preprocessings' in conf else []
-transformations = conf['transformations'] if 'transformations' in conf else []
-classifiers = conf['classifiers'] if 'classifiers' in conf else {}
+subsets = conf.get('subsets', ['train', 'dev', 'test'])
+preprocessings = conf.get('preprocessings', [])
+transformations = conf.get('transformations', {})
+classifiers = conf.get('classifiers', {})
+
 
 local = PathGenerator(
-    conf['res'], conf['classes'], ['train', 'dev', 'test'],
-    preprocessings, transformations, classifiers.keys())
+    conf['res'], conf['classes'], subsets,
+    preprocessings, transformations.keys(), classifiers.keys())
 
 #=============================================
 # Train transformation models
@@ -99,9 +108,8 @@ local = PathGenerator(
 timer = Timer()
 
 if 'train_trans' in conf['execution']:
-
     params = {
-        'transformation': transformations,
+        'transformation': transformations.keys(),
         'preprocessing': preprocessings
     }
 
@@ -112,53 +120,62 @@ if 'train_trans' in conf['execution']:
 
         logger.info("Training '{}-{}' model".format(trans, preproc))
 
+        # training options for current transformation
+        trans_opts = transformations[trans]
+
         # list of training files
         train_files = local.preprocessed_files(preproc, 'train')
 
         # files for dictionary, bow corpus, tf-idf corpus, transformation model
         dict_file = local.dictionary(preproc)
-        dict_file_txt = utils.change_extension(dict_file, 'txt')
+        dict_file_text = utils.change_extension(dict_file, 'txt')
+        dict_file_json = utils.change_extension(dict_file, 'json')
         bow_file = local.transformation_model('bow', trans, preproc)
-        tfidf_file = local.transformation_model('tfidf', trans, preproc)
+
+        tfidf_file = local.transformation_model('TFIDF', trans, preproc)
+        tfidf_shape = utils.change_extension(tfidf_file, 'json')
+
         trans_file = local.transformation_model(trans, trans, preproc)
+        trans_shape = utils.change_extension(trans_file, 'json')
 
-        #-------------------------------------------
-        # set up, filter and save the dictionary
-        #-------------------------------------------
+        if not os.path.exists(dict_file) or not os.path.exists(bow_file):
+            #-------------------------------------------
+            # set up, filter and save the dictionary
+            #-------------------------------------------
 
-        logger.info("Create a new corpus on '{}' files".format(train_files))
-        timer.start_timer()
+            logger.info("Create a new corpus on '{}' files".format(train_files))
+            timer.start_timer()
 
-        corpus = LoadCorpora(train_files)
+            corpus = LoadCorpora(train_files)
 
-        logger.info(
-            'Filter the dictionary: remove words seen '
-            'in less than 3 documents and in more than 75% documents')
+            logger.info("Filter the dictionary using the {} rules".format(
+                filter_dict))
 
-        corpus.dictionary.filter_extremes(
-            no_below=3, no_above=0.75, keep_n=None)
+            corpus.dictionary.filter_extremes(**filter_dict)
 
-        corpus.dictionary.save(dict_file)
-        corpus.dictionary.save_as_text(dict_file_txt)
+            utils.create_path(dict_file)
+            corpus.dictionary.save(dict_file)
+            corpus.dictionary.save_as_text(dict_file_text)
+            dictionary.load_and_save_as_json(dict_file, dict_file_json)
 
-        timer.stop_timer('Dictionary created and filtered')
+            timer.stop_timer('Dictionary created and filtered')
 
-        #-------------------------------------------
-        # set the bow representation
-        # (executed when iterating over the corpus)
-        #-------------------------------------------
+            #-------------------------------------------
+            # set the bow representation
+            # (executed when iterating over the corpus)
+            #-------------------------------------------
 
-        logger.info('Set up and save the bow representation')
-        timer.start_timer()
+            logger.info('Set up and save the bow representation')
+            timer.start_timer()
 
-        pickler.save(bow_file, corpus)
-        timer.stop_timer('BOW transformation executed')
+            pickler.save(bow_file, corpus, 10000)
+            timer.stop_timer('BOW transformation executed')
 
         #-------------------------------------------
         # train the transformation model
         #-------------------------------------------
 
-        # (re)load dictionary and bow_corpus
+        logger.info('Reload dictionary and bow corpus')
         bow_corpus = pickler.load(bow_file)
         dictionary = dictionary.load(dict_file)
 
@@ -166,19 +183,22 @@ if 'train_trans' in conf['execution']:
             logger.info('Train the LDA transformation model')
 
             timer.start_timer()
-            model = TrainTransformer(trans)
+            model = TrainTransformer(trans, trans_opts)
             model.train(bow_corpus, dictionary)
             model.save(trans_file)
             timer.stop_timer('LDA transformation trained')
         else:
-            logger.info('Train the tf-idf transformation model')
+            if not os.path.exists(tfidf_file):
+                logger.info('Train the tf-idf transformation model')
 
-            timer.start_timer()
-            tfidf_model = TrainTransformer('TFIDF')
-            tfidf_model.train(bow_corpus)
-            tfidf_model.save(tfidf_file)
-            tfidf_model.save_shape(utils.change_extension(tfidf_file, 'json'))
-            timer.stop_timer('TFIDF transformation executed')
+                timer.start_timer()
+                tfidf_model = TrainTransformer('TFIDF')
+                tfidf_model.train(bow_corpus)
+                tfidf_model.save(tfidf_file)
+                tfidf_model.save_shape(tfidf_shape)
+                timer.stop_timer('TFIDF transformation executed')
+            else:
+                tfidf_model = LoadTransformer('TFIDF', tfidf_file)
 
             # transform bow_corpus into tfidf_corpus
             tfidf_corpus = tfidf_model.model[bow_corpus]
@@ -187,10 +207,10 @@ if 'train_trans' in conf['execution']:
             logger.info("Train the {} transformation model".format(trans))
 
             timer.start_timer()
-            model = TrainTransformer(trans)
+            model = TrainTransformer(trans, **trans_opts)
             model.train(tfidf_corpus, dictionary)
             model.save(trans_file)
-            model.save_shape(utils.change_extension(trans_file, 'json'))
+            model.save_shape(trans_shape)
             timer.stop_timer("{} transformation trained".format(trans))
 
 #=============================================
@@ -200,7 +220,8 @@ if 'train_trans' in conf['execution']:
 if 'get_topics' in conf['execution']:
 
     params = {
-        'transformation': set(['LSI', 'LDA']).intersection(transformations),
+        'transformation': set(['LSI', 'LDA']).intersection(
+            transformations.keys()),
         'preprocessing': preprocessings
     }
 
@@ -227,7 +248,7 @@ if 'get_topics' in conf['execution']:
 if 'transform_data' in conf['execution']:
 
     params = {
-        'transformation': transformations,
+        'transformation': transformations.keys(),
         'preprocessing': preprocessings
     }
 
@@ -238,7 +259,7 @@ if 'transform_data' in conf['execution']:
 
         # dictionary's file, tf-idf file, current transformation model's file
         dict_file = local.dictionary(preproc)
-        tfidf_file = local.transformation_model('tfidf', trans, preproc)
+        tfidf_file = local.transformation_model('TFIDF', trans, preproc)
         trans_file = local.transformation_model(trans, trans, preproc)
 
         if os.path.exists(dict_file) and os.path.exists(trans_file):
@@ -248,7 +269,7 @@ if 'transform_data' in conf['execution']:
 
             sparams = {
                 'category': conf['classes'],
-                'subset': ['train', 'dev', 'test'],
+                'subset': subsets,
             }
 
             for scombination in itertools.product(*sparams.values()):
@@ -280,7 +301,7 @@ if 'train_classifiers' in conf['execution']:
     for classif_name, options in classifiers.items():
 
         params = {
-            'transformation':  transformations,
+            'transformation':  transformations.keys(),
             'preprocessing': preprocessings,
             'classif_type': options['classif_types'],
             'train_type': options['train_types'],
@@ -288,7 +309,7 @@ if 'train_classifiers' in conf['execution']:
         }
 
         # optional initialization arguments for a given classifier
-        kwargs = options['kwargs'] if 'kwargs' in options else {}
+        kwargs = options.get('kwargs', {})
 
         for combination in itertools.product(*params.values()):
             dict_comb = dict(zip(params.keys(), combination))
@@ -331,7 +352,7 @@ if 'test_classifiers' in conf['execution']:
     for classif_name, options in classifiers.items():
 
         params = {
-            'transformation':  transformations,
+            'transformation':  transformations.keys(),
             'preprocessing': preprocessings,
             'classif_type': options['classif_types'],
             'train_type': options['train_types'],
