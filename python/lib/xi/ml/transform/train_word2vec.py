@@ -8,6 +8,31 @@ from xi.ml.common import Component
 from xi.ml.tools import utils
 from xi.ml.error import ConfigError
 
+def reformat_wv(words_vector):
+    """Change format of words vector"""
+
+    new_wv = {}
+    for index, word in enumerate(words_vector.vocab.keys()):
+        new_wv[word] = [float(x) for x in words_vector.syn0[index]]
+
+    return new_wv
+
+def read_dictionary(dict_file):
+    """Read the word - word_id dictionary"""
+
+    utils.check_file_readable(dict_file)
+
+    word_dictionary = {}
+    with open(dict_file, 'r') as stream:
+        for line in stream:
+            tokens = line.split()
+            if len(tokens) == 3:
+                word_id = int(tokens[0])
+                word = str(tokens[1])
+                word_dictionary[word_id] = word
+
+    return word_dictionary
+
 class WordCorpus:
     """Iterate over sentences"""
 
@@ -26,56 +51,33 @@ class WordCorpus:
                     doc = json.loads(line)
                     yield doc['content'].split()
 
-def reformat_wv(words_vector):
-    """Change format of words vector"""
-
-    new_wv = {}
-    for index, word in enumerate(words_vector.vocab.keys()):
-        new_wv[word] = [float(x) for x in words_vector.syn0[index]]
-
-    return new_wv
-
-def filter_words(words_vector, dict_file):
-    """Keep only words present in the dictionary"""
-
-    utils.check_file_readable(dict_file)
-
-    words_dictionary = {}
-    with open(dict_file, 'r') as stream:
-        for line in stream:
-            tokens = line.split()
-            wordid = int(tokens[0])
-            word = str(tokens[1])
-            words_dictionary[word] = wordid
-
-    new_wv = {}
-    for word, vector in words_vector.items():
-        if word in words_dictionary:
-            new_wv[words_dictionary[word]] = list(vector)
-
-    return new_wv
-
 class TrainWord2Vec(Component):
     """Class training and saving the word2vec models"""
 
-    OPTIONS = {
+    TRANSFORMERS = {
         'cbow': {'size':100, 'sg':0, 'min_count':1, 'workers':4},
         'skipgram': {'size':100, 'sg':1, 'min_count':1, 'workers':4}
     }
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, **kwargs):
         """Initialize the transformation model"""
 
         super().__init__()
 
-        if model_name.lower() not in self.OPTIONS:
+        if model_name.lower() not in self.TRANSFORMERS:
             raise ConfigError(
                 "Unknown model name '{}'. Choose from {}"
-                .format(model_name, self.OPTIONS.keys()))
+                .format(model_name, self.TRANSFORMERS.keys()))
 
         self.model = None
         self.name = model_name.lower()
-        self.vsize = self.OPTIONS[self.name]['size']
+
+        # define the model's training configuration
+        # update default arguments when new provided
+        self.kwargs = dict(self.TRANSFORMERS[self.name])
+        self.kwargs.update(kwargs)
+
+        self.vsize = self.kwargs['size']
 
         self.logger.info(
             "Initialize the {} transformation model".format(self.name))
@@ -91,7 +93,7 @@ class TrainWord2Vec(Component):
         data = WordCorpus(input_files)
 
         self.timer.start_timer()
-        self.model = gensim.models.Word2Vec(data, **self.OPTIONS[self.name])
+        self.model = gensim.models.Word2Vec(data, **self.kwargs)
         self.timer.stop_timer("Model {} trained".format(self.name))
 
     def load(self, bin_file):
@@ -114,30 +116,54 @@ class TrainWord2Vec(Component):
         """
 
         self.check_model()
-        utils.create_path(output)
 
         # recover words vector from model
-        words_vector = self.model.wv
-
         # reformat it for a more practical use: dictionary word:word_weights
-        words_vector = reformat_wv(words_vector)
-
-        # remove unknown words when requested
-        if dict_file is not None:
-            words_vector = filter_words(words_vector, dict_file)
+        words_vector = reformat_wv(self.model.wv)
 
         self.logger.info(
             "Save {} shape: {}-weigths list for each word"
             .format(self.name, self.vsize))
 
-        with open(output, 'w') as ostream:
-            for key, value in words_vector.items():
-                ostream.write(json.dumps(
-                    {key: list(value)}, ensure_ascii=False) + '\n')
+        utils.create_path(output)
+
+        if dict_file is not None:
+            # remove unknown words when requested
+            words_vector = self.filter_words(words_vector, dict_file)
+            with open(output, 'w') as ostream:
+                for value in words_vector:
+                    json.dump(value, ostream)
+                    ostream.write('\n')
+        else:
+            # keep all words present in the model
+            with open(output, 'w') as ostream:
+                for key, value in words_vector.items():
+                    json.dump({key: list(value)}, ostream, ensure_ascii=False)
+                    ostream.write('\n')
 
         self.logger.info(
             "Saved {} transformation's model shape under '{}'"
             .format(self.name, output))
+
+    def filter_words(self, words_vector, dict_file):
+        """Keep only words present in the dictionary"""
+
+        wdict = read_dictionary(dict_file)
+
+        emptyw = 0
+        max_id = max(wdict.keys()) + 1
+
+        new_wv = []
+        for word_id in range(max_id):
+            if word_id in wdict and wdict[word_id] in words_vector:
+                new_wv.append(list(words_vector[wdict[word_id]]))
+            else:
+                new_wv.append([0.0] * self.vsize)
+                emptyw += 1
+
+        self.logger.info("Found {} missing word transformations".format(emptyw))
+
+        return new_wv
 
     def check_model(self):
         """Check if the model was initialized"""
