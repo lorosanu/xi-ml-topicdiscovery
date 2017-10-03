@@ -116,7 +116,7 @@ class FormatterTest < Minitest::Unit::TestCase
       'une quinzaine de jours avant de reprendre on verra bien '\
       'source photo alain pernia midi libre'
 
-    assert_equal words, Xi::ML::Tools::Formatter.words_from_text(text)
+    assert_equal words, Xi::ML::Tools::Formatter.words_from_text(text, true)
   end
 
   def test_text_incorrect
@@ -141,7 +141,7 @@ class FormatterTest < Minitest::Unit::TestCase
       'ligue e journée stade de la beaujoire louis fonteneau samedi septembre '\
       'h match retransmis en direct sur canal'
 
-    assert_equal words, Xi::ML::Tools::Formatter.words_from_text(text)
+    assert_equal words, Xi::ML::Tools::Formatter.words_from_text(text, true)
   end
 
   def test_url_with_extension

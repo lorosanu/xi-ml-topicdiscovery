@@ -27,7 +27,7 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency 'json', '~> 1.8', '>= 1.8.1'
   spec.add_runtime_dependency 'log4r', '~> 1.1', '>= 1.1.10'
-  spec.add_runtime_dependency 'unicode_utils', '~> 1.4', '>= 1.4.0'
+  spec.add_runtime_dependency 'unicode', '~> 0.4', '>= 0.4.4'
   spec.add_runtime_dependency 'narray', '~> 0.6.1', '>= 0.6.1.2'
   spec.add_runtime_dependency 'elasticsearch', '~> 1.1', '>= 1.1.0'
 

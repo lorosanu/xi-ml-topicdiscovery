@@ -3,7 +3,7 @@
 
 
 # Lowercase the input text
-# Use 'unicode_utils' library to fix lowercase for accented caracters
+# Use 'unicode' library to fix lowercase for accented caracters
 class Xi::ML::Preprocess::Cleaner::LowercaseCleaner \
   < Xi::ML::Preprocess::Cleaner::AbstractCleaner
 
@@ -11,6 +11,6 @@ class Xi::ML::Preprocess::Cleaner::LowercaseCleaner \
   end
 
   def clean(text)
-    UnicodeUtils.downcase(text)
+    Unicode.downcase(text)
   end
 end
