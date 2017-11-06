@@ -1,5 +1,23 @@
 # News
 
+## Xi-ML 0.6.0 - 06/11/2017
+* remove structure constraint on push corpus
+* extraction
+    - set longer ES scroll time (avoid timeout crashes)
+    - use an array of query rules instead of only one
+      (necessary for extracting documents from a long list of hosts)
+    - add an optional argument 'limit' in data_fetcher
+      to limit the number of documents stored for each domain name
+* changes in dependencies
+    - use the 'numo-narray' lib instead of the 'narray' (broader & faster)
+    - use the 'unicode' lib instead of the 'unicode_utils' lib (faster)
+* transform & classify
+    - update code to match the new format of models
+    - use the 'numo-narray' lib also for transformation computations
+    - fix computational error in prediction statistics
+* change file paths in config files
+* restructure and fix format of README file
+
 ## Xi-ML 0.5.0 - 20/06/2017
 * optimise code
     - avoid useless 'join', 'split' calls
