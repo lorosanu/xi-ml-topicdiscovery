@@ -1,18 +1,16 @@
-:res: /mnt/data/ml/docs/resources/fr/3categories/ssu/
+:res: /mnt/data/ml/docs/resources/fr/1category/a/
 :classes:
-  - :society
-  - :sport
-  - :_UNK_
+  - :adult
 :execution:
   - :extract
   - :build
   - :clean
 :extract:
   :es:
-    :name: es1preprod
+    :name: lab09
     :ip: localhost
     :host: localhost
-    :port: '9223'
+    :port: '9200'
   :esquery:
     :index:
       - article
@@ -21,16 +19,16 @@
       - content
     :source:
       - :id
-      - :lang
       - :site
       - :url
+      - :lang
       - :title
+      - :description
+      - :keywords
       - :content
     :min_nchars: 200
   :hosts:
-    :society: ./conf/fr/hosts_3classes/society_hosts.yml
-    :sport: ./conf/fr/hosts_3classes/sport_hosts.yml
-    :_UNK_: ./conf/fr/hosts_3classes/unk_hosts.yml
+     :adult: ./conf/fr/hosts_adult/adult_hosts.yml
   :lang: :fr
   :query_filter: :url_regexp
 :build:

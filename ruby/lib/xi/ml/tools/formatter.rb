@@ -8,38 +8,41 @@ class Xi::ML::Tools::Formatter
   # Static method to recover clean words from a text
   #
   # @param text [String] a given text
+  # @param clean_upcase [Boolean] apply an upcase cleaner (slow & !100%reliable)
   # @return [String] the joined list of words from the clean, lowercase text
-  def self.words_from_text(text)
+  def self.words_from_text(text, clean_upcase=false)
     return '' if text.nil? || text.empty?
 
     # remove all non latin characters (including digits)
     ctext = text.gsub(/[^\p{Latin}']/, ' ')
 
+    if clean_upcase
+      # clean badly formatted words (mix upcase & downcase in one word)
+      # ex: JOURNEEJeudi, JavierRABIOT, journéeStade
+      nwords = []
+
+      ctext.split.each do |word|
+        if word != Unicode.upcase(word)
+          if word =~ /[\p{Lu}]{2}/
+            word = word.gsub(/(?<=\p{Lu})(\p{Lu}+)(?=\p{Lu}|$)/)\
+              {|match| Unicode.downcase(match) }
+          end
+
+          # check for camel case words (ex: JourneeJeudi)
+          word = word.split(/(?=\p{Lu})/).join(' ') if word =~ /[\p{Lu}]/
+        end
+
+        nwords << word
+      end
+
+      ctext = nwords.join(' ')
+    end
+
     # add a space after any '
     ctext.gsub!("'", "' ")
 
-    # clean badly formatted words (upcase/downcase)
-    nwords = []
-
-    ctext.split.each do |word|
-      if word != UnicodeUtils.upcase(word)
-        # check for badly formatted words (ex: JOURNEEJeudi)
-        if word =~ /[\p{Lu}]{2}/
-          word = word.gsub(/(?<=\p{Lu})(\p{Lu}+)(?=\p{Lu}|$)/)\
-            {|match| UnicodeUtils.downcase(match) }
-        end
-
-        # check for camel case words (ex: JourneeJeudi)
-        word = word.split(/(?=\p{Lu})/).join(' ') if word =~ /[\p{Lu}]/
-      end
-
-      nwords << word
-    end
-
-    ctext = nwords.join(' ')
-
-    # lowercase
-    UnicodeUtils.downcase(ctext)
+    # remove extra spaces and lowercase text
+    Unicode.downcase(ctext.split.join(' '))
   end
 
   # Static method to recover words from an url
@@ -56,6 +59,8 @@ class Xi::ML::Tools::Formatter
     rescue
       return ''
     end
+
+    return '' if uri.host.nil? || uri.host.empty?
 
     # do not keep the top level domain name or the www.
     words << uri.host.split('.')[0..-2].tap{|a| a.delete('www') }.join(' ')

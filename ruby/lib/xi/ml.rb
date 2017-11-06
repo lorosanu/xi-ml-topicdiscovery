@@ -8,12 +8,12 @@ require 'json'
 require 'yaml'
 require 'digest'            # SHA1 conversion
 require 'fileutils'         # create path
-require 'unicode_utils'     # lib to lowercase accents
+require 'unicode'           # lib to lowercase accents
 require 'log4r'
 require 'elasticsearch'
 require 'socket'
 require 'timeout'
-require 'narray'            # lib for dot product
+require 'numo/narray'       # lib for dot product
 
 module Xi
   module ML

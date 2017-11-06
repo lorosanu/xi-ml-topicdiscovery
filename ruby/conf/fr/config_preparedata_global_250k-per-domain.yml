@@ -1,43 +1,43 @@
-:res: /mnt/data/ml/docs/resources/fr/3categories/ssu/
+:res: /mnt/data/ml/docs/resources/fr/1category/g/
 :classes:
-  - :society
-  - :sport
-  - :_UNK_
+  - :global
 :execution:
   - :extract
-  - :build
-  - :clean
 :extract:
   :es:
-    :name: es1preprod
+    :name: es1prod
     :ip: localhost
     :host: localhost
-    :port: '9223'
+    :port: '9225'
   :esquery:
     :index:
       - article
       - product
+      - video
+      - image
+      - home
     :type:
       - content
     :source:
       - :id
-      - :lang
       - :site
       - :url
+      - :lang
       - :title
+      - :description
+      - :keywords
       - :content
     :min_nchars: 200
+    :limit: 250000
   :hosts:
-    :society: ./conf/fr/hosts_3classes/society_hosts.yml
-    :sport: ./conf/fr/hosts_3classes/sport_hosts.yml
-    :_UNK_: ./conf/fr/hosts_3classes/unk_hosts.yml
+     :global: ./conf/fr/hosts_global/global_hosts.yml
   :lang: :fr
   :query_filter: :url_regexp
 :build:
   :division:
-    :train: 80
-    :dev: 10
-    :test: 10
+    :train: 100
+    :dev: 0
+    :test: 0
 :clean:
   :preprocs:
     :PDLW:

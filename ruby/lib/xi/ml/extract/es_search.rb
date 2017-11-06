@@ -45,7 +45,7 @@ class Xi::ML::Extract::ESSearch < Xi::ML::Tools::Component
 
     @index = index
     @type = type
-    @source = source.clone
+    @source = source.dup
     @query = query
   end
 
@@ -63,7 +63,7 @@ class Xi::ML::Extract::ESSearch < Xi::ML::Tools::Component
       res = @client.search(
         index: "#{@index}",
         type: "#{@type}",
-        scroll: '1m',
+        scroll: '5m',
         search_type: 'scan',
         size: 1000,
         body: "#{@query}",
@@ -77,7 +77,7 @@ class Xi::ML::Extract::ESSearch < Xi::ML::Tools::Component
     # scroll the ES results
     @logger.info('Scroll the results ...')
     begin
-      while (res = @client.scroll(scroll: '1m', scroll_id: res['_scroll_id']))\
+      while (res = @client.scroll(scroll: '5m', scroll_id: res['_scroll_id']))\
         && !res['hits']['hits'].empty?
 
         res['hits']['hits'].each do |doc|

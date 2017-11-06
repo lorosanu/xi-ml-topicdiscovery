@@ -4,9 +4,11 @@
 
 # LogisticRegression classifier
 class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
-  attr_reader :input, :conf, :probas
+  attr_reader :input, :probas, \
+    :classes, :n_classes, :n_features, \
+    :coeffs, :intercept
 
-  OPTIONS = %w[name n_classes n_features classes coefs intercept].freeze
+  STRUCTURE = %w[name n_classes n_features classes coeffs intercept].freeze
 
   # Initialize the LogisticRegression classifier
   #
@@ -17,35 +19,48 @@ class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
     Xi::ML::Tools::Utils.check_file_readable!(input)
     @input = input
 
-    load_config()
+    load_model_parameters()
     @logger.info('Loaded already trained LR classifier')
   end
 
   # Load the classifier's parameters
-  def load_config
+  def load_model_parameters
+    params = {}
+
     begin
-      @conf = JSON.load(File.read(@input))
+      params = JSON.load(File.read(@input))
 
-      raise Xi::ML::Error::ConfigError, "No data found in JSON file #{@input}"\
-        if @conf.empty?
+      raise Xi::ML::Error::ConfigError, \
+        "No data found in JSON file #{@input}" \
+        if params.empty?
 
-      raise Xi::ML::Error::ConfigError, "JSON object stored in '#{@input}' "\
-        + 'is not a HASH' \
-        unless @conf.is_a?(Hash)
+      raise Xi::ML::Error::ConfigError, \
+        "JSON object stored in '#{@input}' is not a HASH" \
+        unless params.is_a?(Hash)
     rescue => e
       raise Xi::ML::Error::CaughtException, \
-        "Bad format of YAML file #{@input}: #{e.message}"
+        "Bad format of JSON file #{@input}: #{e.message}"
     end
 
     raise Xi::ML::Error::ConfigError, \
-      "Given configuration '#{@conf}' doesn't match '#{OPTIONS}' structure" \
-      unless @conf.keys.sort == OPTIONS.sort
+      "Given parameters '#{params}' do not match '#{STRUCTURE}' structure" \
+      unless params.keys.sort == STRUCTURE.sort
 
     raise Xi::ML::Error::ConfigError, \
       'Invalid classifier model: '\
-      "not equal dimensions between coefficients (#{@conf['coefs'].size}) "\
-      "and classes (#{@conf['n_classes']})" \
-      if @conf['n_classes'] > 2 && @conf['coefs'].size != @conf['classes'].size
+      "not equal dimensions between coefficients (#{params['coeffs'].size}) " \
+      "and classes (#{params['n_classes']})" \
+      if params['n_classes'] > 2 \
+        && params['coeffs'].size != params['classes'].size
+
+    # store parameters
+    @n_classes = params['n_classes']
+    @n_features = params['n_features']
+    @classes = params['classes']
+    @coeffs = params['coeffs'].map{|x| Numo::DFloat[*x] }
+    @intercept = params['intercept']
+
+    params.clear()
   end
 
   # Predict class for a new document
@@ -65,43 +80,43 @@ class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
     return {} if features.empty?
 
     raise Xi::ML::Error::DataError, \
-      "Document must contain #{@conf['n_features']} features "\
-      + "instead of #{features.size} features"\
-      if features.size != @conf['n_features']
+      "Document must contain #{@n_features} features "\
+      "instead of #{features.size} features"\
+      if @n_features != features.size
 
     # special format for the 2-class classifier
-    if @conf['n_classes'] == 2
-      # coefs: matrix form [1 x n_features]
+    if @n_classes == 2
+      # coeffs: matrix form [1 x n_features]
       # intercept: matrix form [1 x n_features]
 
-      coefs = @conf['coefs'][0]
-      intercept = @conf['intercept'][0]
-
       # lr_prob => the class probability of the second class
-      prob = lr_prob(features, coefs, intercept)
+      prob = lr_prob(features, @coeffs[0], @intercept[0])
 
-      @probas = {}
-      @probas[@conf['classes'][1]] = prob
-      @probas[@conf['classes'][0]] = (1.0 - prob).round(7)
+      @probas = {
+        @classes[1] => prob,
+        @classes[0] => (1.0 - prob).round(7),
+      }
+
       return @probas
     end
 
-    if @conf['n_classes'] > 2
-      # coefs: matrix form [n_classes x n_features]
+    if @n_classes > 2
+      # coeffs: matrix form [n_classes x n_features]
       # intercept: matrix form [n_classes x n_features]
 
       @probas = {}
-      @conf['coefs'].each_with_index do |class_coefs, index|
-        category = @conf['classes'][index]
-        intercept = @conf['intercept'][index]
+      @coeffs.each_with_index do |class_coeffs, index|
+        category = @classes[index]
+        intercept = @intercept[index]
 
         # lr_prob => the current class probability
-        @probas[category] = lr_prob(features, class_coefs, intercept)
+        @probas[category] = lr_prob(features, class_coeffs, intercept)
       end
 
       # normalize probabilities (sum > 1.0)
       sum_p = @probas.values.reduce {|sum, wx| sum + wx }
       @probas = @probas.map{|category, pb| [category, pb / sum_p] }.to_h
+
       return @probas
     end
 
@@ -109,15 +124,14 @@ class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
   end
 
   # Compute the LR's fx probability
-  def lr_prob(features, coefs, intercept)
+  def lr_prob(features, coeffs, intercept)
     # sum = w0 * x0 + w1 * x1 + ...
-    sum = 0
-    coefs.zip(features){|w, x| sum += w * x }
+    sum = (Numo::DFloat[*features] * coeffs).sum
 
-    # add intercept
-    fx = sum + intercept
+    # add intercept and negate
+    fx = -(sum + intercept)
 
-    prob = 1.0 / (1.0 + Math.exp(-1 * fx))
+    prob = 1.0 / (1.0 + Math.exp(fx))
     prob.round(7)
   end
 
@@ -129,10 +143,10 @@ class Xi::ML::Classify::LRClassifier < Xi::ML::Tools::Component
     predict_proba(doc) if @probas.empty?
 
     # no features => no probabilities => category not available
-    return '_NA_' if @probas.empty?
+    return Xi::ML::Classify::Classifier::NOCLASS if @probas.empty?
 
     @probas.key(@probas.values.max)
   end
 
-  private :load_config, :lr_prob
+  private :load_model_parameters, :lr_prob
 end

@@ -21,16 +21,16 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
     @logger.info('Generate all the necessary paths for data files and models')
 
     @res = res
-    @classes = classes.clone
-    @subsets = subsets.clone
-    @preproc = preproc.clone
-    @trans = trans.clone
-    @classifs = classifs.clone
+    @classes = classes.map(&:to_sym)
+    @subsets = subsets.map(&:to_sym)
+    @preproc = preproc.map(&:to_sym)
+    @trans = trans.map(&:to_sym)
+    @classifs = classifs.map(&:to_sym)
 
     @paths = {}
 
     # data files
-    @paths['data'] = generate_data_files()
+    @paths[:data] = generate_data_files()
 
     @logger.info("The generated paths:\n#{PP.pp(@paths, '')}")
   end
@@ -47,7 +47,7 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
     files = []
 
     @classes.each do |category|
-      filename = @paths['data'][category][:preprocessed][ptype]['train']
+      filename = @paths[:data][category][:preprocessed][ptype][:train]
       Xi::ML::Tools::Utils.check_file_readable!(filename)
       files << filename
     end
@@ -60,7 +60,7 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
   # File should already exist
   def get_preprocessed_file(category, subset, preprocess)
     begin
-      filename = @paths['data'][category]['preprocessed'][preprocess][subset]
+      filename = @paths[:data][category][:preprocessed][preprocess][subset]
 
     rescue => e
       @logger.warn("Hash path #{category}/preprocessed/#{preprocess}/#{subset}"\
@@ -75,16 +75,15 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
   # transformation, preprocessing.
   # File should be created
   def get_transformed_file(category, subset, transformation, preprocess)
-    format = "#{transformation}_#{preprocess}"
+    format = :"#{transformation}_#{preprocess}"
 
     begin
-      filename = @paths['data'][category]['transformed'][format][subset]
+      filename = @paths[:data][category][:transformed][format][subset]
     rescue => e
       @logger.warn("Hash path #{category}/transformed/#{format}/#{subset}"\
         + " does not exist: #{e.message}")
     end
 
-    Xi::ML::Tools::Utils.create_path(filename)
     filename
   end
 
@@ -94,16 +93,15 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
   def get_classified_file(category, subset,
     classification, transformation, preprocess)
 
-    format = "#{classification}_#{transformation}_#{preprocess}"
+    format = :"#{classification}_#{transformation}_#{preprocess}"
 
     begin
-      filename = @paths['data'][category]['classified'][format][subset]
+      filename = @paths[:data][category][:classified][format][subset]
     rescue => e
       @logger.warn("Hash path #{category}/classified/#{format}/#{subset}"\
         + " does not exist: #{e.message}")
     end
 
-    Xi::ML::Tools::Utils.create_path(filename)
     filename
   end
 
@@ -113,7 +111,7 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
   def get_test_classified_files(classification, transformation, preprocess)
     files = []
     @classes.each do |category|
-      filename = get_classified_file(category, 'test',
+      filename = get_classified_file(category, :test,
         classification, transformation, preprocess)
 
       Xi::ML::Tools::Utils.check_file_readable!(filename)
@@ -129,9 +127,7 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
   # File should be created
   def get_stats_file(classification, transformation, preprocess)
     format = "#{classification}_#{transformation}_#{preprocess}"
-
     filename = File.join(@res, 'stats', format + '.json')
-    Xi::ML::Tools::Utils.create_path(filename)
 
     filename
   end
@@ -147,33 +143,34 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
     # extracted data
     @classes.each do |category|
       files[category] = {}
-      folder = File.join(@res, 'data', category, 'extracted')
+      folder = File.join(@res, 'data', category.to_s, 'extracted')
 
-      files[category]['extracted'] = File.join(folder, "#{category}.json")
+      files[category][:extracted] = File.join(folder, "#{category}.json")
     end
 
     # divided data
     @classes.each do |category|
-      files[category]['divided'] = {}
-      folder = File.join(@res, 'data', category, 'divided')
+      files[category][:divided] = {}
+      folder = File.join(@res, 'data', category.to_s, 'divided')
 
       @subsets.each do |subset|
-        files[category]['divided'][subset] = File.join(folder,
+        files[category][:divided][subset] = File.join(folder,
           "#{category}_#{subset}.json")
       end
     end
 
     # preprocessed data
     @classes.each do |category|
-      files[category]['preprocessed'] = {}
+      files[category][:preprocessed] = {}
 
       @preproc.each do |preprocess|
-        folder = File.join(@res, 'data', category, 'preprocessed', preprocess)
+        folder = File.join(
+          @res, 'data', category.to_s, 'preprocessed', preprocess.to_s)
 
-        files[category]['preprocessed'][preprocess] = {}
+        files[category][:preprocessed][preprocess] = {}
 
         @subsets.each do |subset|
-          files[category]['preprocessed'][preprocess][subset] = File.join(
+          files[category][:preprocessed][preprocess][subset] = File.join(
             folder, "#{category}_#{subset}.json")
         end
       end
@@ -182,17 +179,19 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
     # transformed data
     if @trans.size > 0
       @classes.each do |category|
-        files[category]['transformed'] = {}
+        files[category][:transformed] = {}
 
         @trans.each do |transformation|
           @preproc.each do |preprocess|
-            ctrans = "#{transformation}_#{preprocess}"
+            ctrans = :"#{transformation}_#{preprocess}"
 
-            folder = File.join(@res, 'data', category, 'transformed', ctrans)
-            files[category]['transformed'][ctrans] = {}
+            folder = File.join(
+              @res, 'data', category.to_s, 'transformed', ctrans.to_s)
+
+            files[category][:transformed][ctrans] = {}
 
             @subsets.each do |subset|
-              files[category]['transformed'][ctrans][subset] = File.join(
+              files[category][:transformed][ctrans][subset] = File.join(
                 folder, "#{category}_#{subset}.json")
             end
           end
@@ -203,18 +202,20 @@ class Xi::ML::Tools::PathGenerator < Xi::ML::Tools::Component
     # classified data
     if @classifs.size > 0
       @classes.each do |category|
-        files[category]['classified'] = {}
+        files[category][:classified] = {}
 
         @classifs.each do |classifier|
           @trans.each do |transformation|
             @preproc.each do |preprocess|
-              ctrans = "#{classifier}_#{transformation}_#{preprocess}"
+              ctrans = :"#{classifier}_#{transformation}_#{preprocess}"
 
-              folder = File.join(@res, 'data', category, 'classified', ctrans)
-              files[category]['classified'][ctrans] = {}
+              folder = File.join(
+                @res, 'data', category.to_s, 'classified', ctrans.to_s)
+
+              files[category][:classified][ctrans] = {}
 
               @subsets.each do |subset|
-                files[category]['classified'][ctrans][subset] = File.join(
+                files[category][:classified][ctrans][subset] = File.join(
                   folder, "#{category}_#{subset}.json")
               end
             end

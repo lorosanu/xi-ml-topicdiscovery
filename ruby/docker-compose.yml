@@ -1,8 +1,7 @@
 ml:
   image: ml-devel
   volumes:
-  - /mnt/data/ml/resources/:/mnt/data/ml/resources/
-  - /mnt/data/ml/caid_models/:/mnt/data/ml/caid_models/
+  - /mnt/data/ml/:/mnt/data/ml/
 
 ml-devel:
   extends:
@@ -15,7 +14,7 @@ lab-ml-devel:
   extends:
     service: ml-devel
   volumes:
-  - /mnt/data0/ml/resources/:/mnt/data0/ml/resources/
+  - /mnt/data0/ml/:/mnt/data0/ml/
 
 mysql:
   image: xi-nlp-mysql
@@ -30,7 +29,7 @@ ml-nlp-devel:
   - virtuoso
   volumes:
   - ..:/src
-  - /mnt/data/ml/resources/:/mnt/data/ml/resources/
+  - /mnt/data/ml/:/mnt/data/ml/
   working_dir: /src/ruby
 
 lab-ml-nlp-devel:
@@ -40,5 +39,5 @@ lab-ml-nlp-devel:
   - virtuoso
   volumes:
   - ..:/src
-  - /mnt/data0/ml/resources/:/mnt/data0/ml/resources/
+  - /mnt/data0/ml/:/mnt/data0/ml/
   working_dir: /src/ruby

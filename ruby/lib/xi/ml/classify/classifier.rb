@@ -7,10 +7,11 @@
 class Xi::ML::Classify::Classifier < Xi::ML::Tools::Component
   attr_reader :name, :model
 
+  NOCLASS = '_NA_'.freeze
   CLASSIFIERS = {
-      'LogisticRegression' => Xi::ML::Classify::LRClassifier,
-      'MLPClassifier' => Xi::ML::Classify::MLPClassifier,
-    }.freeze
+    LogisticRegression: Xi::ML::Classify::LRClassifier,
+    MLPClassifier: Xi::ML::Classify::MLPClassifier,
+  }.freeze
 
   # Initialize the classifier
   #
@@ -29,15 +30,15 @@ class Xi::ML::Classify::Classifier < Xi::ML::Tools::Component
 
   # Predict class for a new document
   #
-  # @param doc [String] the list of features separated by spaces
+  # @param doc [Array] the list of the document's float features
   # @return [Hash] the most likely class and the class probabilities
   def classify_doc(doc)
     @model.classify_doc(doc)
   end
 
-  # Transform given corpus into given format
+  # Classify each document in a given corpus
   #
-  # @param data_file [String] file of json corpus with reference documents
+  # @param data_file [String] file of json corpus with documents features
   # @param output_file [String] file of json corpus with 'season'&'season_prob'
   def store_classification(data_file, output_file)
     Xi::ML::Tools::Utils.check_file_readable!(data_file)
@@ -47,13 +48,13 @@ class Xi::ML::Classify::Classifier < Xi::ML::Tools::Component
     @timer.start_timer()
 
     sc = Xi::ML::Corpus::StreamCorpus.new(data_file)
-    pc = Xi::ML::Corpus::PushCorpus.new(output_file,
-      %w[id url title content category features season season_prob])
+    pc = Xi::ML::Corpus::PushCorpus.new(output_file)
 
     sc.each_doc do |doc|
       if doc['features']
         prediction = @model.classify_doc(doc['features'])
 
+        # add two new fields into each document entry
         doc['season'] = prediction[:category]
         doc['season_prob'] = prediction[:probas]
         pc.add(doc)
@@ -65,5 +66,4 @@ class Xi::ML::Classify::Classifier < Xi::ML::Tools::Component
 
     pc.close_stream()
   end
-
 end

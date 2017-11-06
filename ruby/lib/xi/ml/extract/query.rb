@@ -6,16 +6,17 @@
 class Xi::ML::Extract::Query < Xi::ML::Tools::Component
   attr_reader :input, :lang, :hosts, :rules
 
-  FILTERS = %w[host url-qs url-prefix url-regexp].freeze
-  FORMATS = %w[query_string query_filtered].freeze
+  MAX_HOSTS = 200.freeze
+  FILTERS = [:host, :url_querystring, :url_prefix, :url_regexp].freeze
+  FORMATS = [:query_string, :query_filtered].freeze
 
   # Initialize the query: create the rules
   #   based on the list of hosts extracted from the input file
   #
   # @param input [String] the name of the input file
-  # @param lang [String] the document's language
-  # @param filter [String] the type of filter to apply on urls list
-  # @return [String] the generated query rules
+  # @param lang [Symbol] the document's language
+  # @param filter [Symbol] the type of filter to apply on urls list
+  # @return [Array] the generated array of query rules
   def initialize(input, lang, filter)
     super()
 
@@ -34,41 +35,56 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
   def read_hosts
     Xi::ML::Tools::Utils.check_file_readable!(@input)
     begin
-      @hosts = YAML.load(File.read(@input))
+      hosts = YAML.load(File.read(@input))
 
       raise Xi::ML::Error::ConfigError, \
         "Empty list in YAML file '#{@input}'" \
-        if @hosts.empty?
+        if hosts.empty?
 
       raise Xi::ML::Error::ConfigError, \
         "YAML object stored in '#{@input}' is not an ARRAY" \
-        unless @hosts.is_a?(Array)
+        unless hosts.is_a?(Array)
 
     rescue => e
       raise Xi::ML::Error::CaughtException, \
         "Bad format of YAML file '#{@input}' : #{e.message}"
     end
 
-    @logger.info("#{@hosts.size} urls given")
+    @logger.info("#{hosts.size} urls given")
+
+    split_hosts(hosts)
+  end
+
+  # Split list of hosts into serveral sub-lists in case if it's too long
+  # @param hosts [Array] the hosts list
+  def split_hosts(hosts)
+    @hosts = []
+
+    if hosts.size <= MAX_HOSTS
+      @hosts << hosts
+    else
+      nsplits = (1.0 * hosts.size / MAX_HOSTS).ceil
+      nsamples = (1.0 * hosts.size / nsplits).ceil
+
+      nsplits.times do
+        samples = hosts.sample(nsamples)
+        @hosts << samples
+        hosts -= samples
+      end
+    end
   end
 
   # Prepare the ES query based on the hosts / urls list
   #
   # @param filter [String] the type of filter to apply on urls list
-  # @return [String] the generated query rules
+  # @return [Array] the generated query rules
   def prepare_rules(filter)
-    case filter
-    when 'host'
-      @rules = filter_hosts()
-    when 'url-qs'
-      @rules = filter_urls_qs()
-    when 'url-prefix'
-      @rules = filter_urls_prefix()
-    when 'url-regexp'
-      @rules = filter_urls_regexp()
-    end
+    filter_method = "filter_by_#{filter}"
 
-    @rules
+    @rules = []
+    @hosts.each do |sub_hosts|
+      @rules << self.__send__(filter_method, sub_hosts)
+    end
   end
 
   # Keep only the host of each url and use an ES query on 'site'
@@ -76,12 +92,13 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
   #  * String: "lequipe", "lequipe.fr", "www.lequipe.fr", ...
   #  * URL: "http://www.lequipe.fr"
   #
+  # @param hosts [Array] the hosts list
   # @return [String] the generated query rules
-  def filter_hosts
+  def filter_by_host(hosts)
     rules = []
     count_urls = 0
 
-    @hosts.each do |item|
+    hosts.each do |item|
       # get the host (check if simple String or URL)
       if URI(item).host.nil?
         host = item
@@ -114,16 +131,17 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
     rules = rules.join(' OR ')
 
     # return formatted query
-    format_query('query_string', rules)
+    format_query(:query_string, rules)
   end
 
   # Keep entire url and use an ES query on 'url'
   #
+  # @param hosts [Array] the hosts list
   # @return [String] the generated query rules
-  def filter_urls_qs
+  def filter_by_url_querystring(hosts)
     rules = []
 
-    @hosts.each do |url|
+    hosts.each do |url|
       # remove http/https/www prefix
       url = url.sub(%r{^https?\:\/\/}, '')
       url = url.sub(/^(www.)?/, '')
@@ -153,13 +171,17 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
     rules = rules.join(' OR ')
 
     # return formatted query
-    format_query('query_string', rules)
+    format_query(:query_string, rules)
   end
 
-  def filter_urls_prefix
+  # Use a 'prefix' query on urls list: http(s), www
+  #
+  # @param hosts [Array] the hosts list
+  # @return [String] the generated query rules
+  def filter_by_url_prefix(hosts)
     rules = []
 
-    @hosts.each do |url|
+    hosts.each do |url|
       # remove http/https/www prefix
       url = url.sub(%r{^https?\:\/\/}, '')
       url = url.sub(/^(www.)?/, '')
@@ -185,13 +207,17 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
     rules = rules.join(', ')
 
     # return formatted query
-    format_query('query_filtered', rules)
+    format_query(:query_filtered, rules)
   end
 
-  def filter_urls_regexp
+  # Use 'regexp' query on urls list
+  #
+  # @param hosts [Array] the hosts list
+  # @return [String] the generated query rules
+  def filter_by_url_regexp(hosts)
     rules = []
 
-    @hosts.each do |url|
+    hosts.each do |url|
       # remove http/https/www prefix
       url = url.sub(%r{^https?\:\/\/}, '')
       url = url.sub(/^(www.)?/, '')
@@ -208,14 +234,14 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
     rules = rules.join(', ')
 
     # return formatted query
-    format_query('query_filtered', rules)
+    format_query(:query_filtered, rules)
   end
 
   def format_query(type, rules)
     query = ''
 
     case type
-    when 'query_string'
+    when :query_string
       query = <<-EOS
       {
         query: {
@@ -225,7 +251,7 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
         }
       }
       EOS
-    when 'query_filtered'
+    when :query_filtered
       query = <<-EOS
       {
         query: {
@@ -244,11 +270,8 @@ class Xi::ML::Extract::Query < Xi::ML::Tools::Component
     query.strip.gsub(/\s+/, ' ')
   end
 
-  def to_s
-    @rules
-  end
-
-  private :read_hosts, :prepare_rules, \
-    :filter_hosts, :filter_urls_qs, :filter_urls_prefix, :filter_urls_regexp, \
+  private :read_hosts, :split_hosts, :prepare_rules, \
+    :filter_by_host, :filter_by_url_querystring, \
+    :filter_by_url_prefix, :filter_by_url_regexp, \
     :format_query
 end

@@ -9,7 +9,7 @@ require 'xi/ml'
 class TransformerTest < Minitest::Unit::TestCase
 
   def setup
-    dict_file = File.join(File.dirname(__FILE__), 'example_dictionary.txt')
+    dict_file = File.join(File.dirname(__FILE__), 'example_dictionary.json')
     tfidf_file = File.join(File.dirname(__FILE__), 'example_model_tfidf.json')
     lsi_file = File.join(File.dirname(__FILE__), 'example_model_lsi.bin')
 
@@ -17,7 +17,7 @@ class TransformerTest < Minitest::Unit::TestCase
     Xi::ML::Tools::Utils.check_file_readable!(tfidf_file)
     Xi::ML::Tools::Utils.check_file_readable!(lsi_file)
 
-    @transformer = Xi::ML::Transform::Transformer.new('LSI',
+    @transformer = Xi::ML::Transform::Transformer.new(:LSI,
       { dict: dict_file, tfidf: tfidf_file, lsi: lsi_file })
 
     @doc_sport = 'une semaine après le refus de xavi hernandez de rejoindre '\

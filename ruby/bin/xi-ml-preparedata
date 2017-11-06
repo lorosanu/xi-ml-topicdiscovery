@@ -59,7 +59,6 @@ rescue => e
   abort "[Error] Bad format of YAML file '#{@options[:conf]}' : #{e.message}"
 end
 
-# @conf[:lang]              process documents of language 'lang'
 # @conf[:classes]           process documents of classes 'classes'
 # @conf[:version]           data version (optional)
 # @conf[:res]               config for the resources locations (data, conf)
@@ -67,6 +66,7 @@ end
 # @conf[:extract][:es]      config for ElasticSearch (name, ip, host, port)
 # @conf[:extract][:esquery] config for the ES query (index, type, min_nchars)
 # @conf[:extract][:hosts]   category hosts for ES extraction
+# @conf[:extract][:lang]    process documents of language 'lang'
 # @conf[:extract][:query_filter] type of filter to apply on hosts url
 # @conf[:build][:division]  divide corpus into train/dev/test subsets
 # @conf[:clean][:preprocs]  list of preprocessing types to apply on data
@@ -78,43 +78,41 @@ Xi::ML.logger.info("Processing current configuration:\n#{PP.pp(@conf, '')}")
 # Checkup config options
 #======================================================================
 
-[:lang, :classes, :res, :execution].each do |arg|
+[:res, :classes, :execution].each do |arg|
   abort "Missing argument '#{arg}'" unless @conf.key?(arg)
 end
 
 if @conf[:execution].include?(:extract)
   abort 'Missing argument :extract' unless @conf.key?(:extract)
 
-  [:es, :esquery, :hosts, :query_filter].each do |arg|
-    abort "Missing argument '#{arg}'" unless @conf[:extract].key?(arg)
+  [:es, :esquery, :hosts].each do |arg|
+    abort "Missing argument extract[#{arg}]" unless @conf[:extract].key?(arg)
   end
 
   [:name, :ip, :host, :port].each do |arg|
-    abort "Missing argument '#{arg}'" unless @conf[:extract][:es].key?(arg)
+    abort "Missing argument extract[:es][:#{arg}]" \
+      unless @conf[:extract][:es].key?(arg)
   end
 
   [:index, :type, :source, :min_nchars].each do |arg|
-    abort "Missing argument '#{arg}'" unless @conf[:extract][:esquery].key?(arg)
+    abort "Missing argument extract[:esquery][:#{arg}]" \
+      unless @conf[:extract][:esquery].key?(arg)
   end
 
   @conf[:classes].each do |arg|
-    abort "Missing argument '#{arg}'" unless @conf[:extract][:hosts].key?(arg)
-  end
-
-  # check if hosts files exist
-  @conf[:extract][:hosts].each do |_, hosts_file|
-    Xi::ML::Tools::Utils.check_file_readable!(hosts_file)
+    abort "Missing argument extract[:hosts][:#{arg}]" \
+      unless @conf[:extract][:hosts].key?(arg)
   end
 end
 
 if @conf[:execution].include?(:build)
   abort 'Missing argument :build' unless @conf.key?(:build)
-  abort 'Missing argument :division' unless @conf[:build].key?(:division)
+  abort 'Missing argument build[:division]' unless @conf[:build].key?(:division)
 end
 
 if @conf[:execution].include?(:clean)
   abort 'Missing argument :clean' unless @conf.key?(:clean)
-  abort 'Missing argument :preprocs' unless @conf[:clean].key?(:preprocs)
+  abort 'Missing argument clean[:preprocs]' unless @conf[:clean].key?(:preprocs)
 end
 
 
@@ -133,7 +131,7 @@ else
 end
 
 # base data dir
-ddata = File.join(@conf[:res], @conf[:lang], version)
+ddata = File.join(@conf[:res], version)
 Xi::ML::Tools::Utils.create_folder(ddata)
 
 
@@ -145,7 +143,6 @@ Xi::ML::Tools::Utils.create_folder(ddata)
 preproc_names = []
 if @conf[:execution].include?(:clean)
   preproc_names = @conf[:clean][:preprocs].keys()
-  preproc_names = preproc_names.map {|ptype| ptype.to_s }
 end
 
 # paths for data: extracted, divided, preprocessed
@@ -157,19 +154,18 @@ pg = Xi::ML::Tools::PathGenerator.new(ddata, @conf[:classes],
 Paths example
 @local =
 {
-  'data': {
-    'sport': {
-      'extracted': '...',
-      'divided': { 'train': '...', 'dev': '...', 'test': '...'},
-      'preprocessed': {
-        'PLW': { 'train': '...', 'dev': '...', 'test': '...'},
-        'PDLW': { 'train': '...', 'dev': '...', 'test': '...'},
+  data: {
+    sport: {
+      extracted: '...',
+      divided: { train: '...', dev: '...', test: '...'},
+      preprocessed: {
+        PDLW: { train: '...', dev: '...', test: '...'},
         ...
-        }
       }
-    'non-sport': {
+    }
+    non-sport: {
       ...
-      }
+    }
   }
 }
 =end
@@ -189,25 +185,52 @@ if @conf[:execution].include?(:extract)
   # save extracted data into 1 json file for each category
   @conf[:classes].each do |category|
     input_config_file = @conf[:extract][:hosts][category]
-    output_data_file = @local['data'][category]['extracted']
+    output_data_file = @local[:data][category][:extracted]
 
     Xi::ML.logger.info("Extract #{category} content from ES ")
 
-    # create the ES query based on the hosts list
-    @query = Xi::ML::Extract::Query.new(input_config_file,
-      @conf[:lang], @conf[:extract][:query_filter])
+    if !input_config_file.nil? && File.readable?(input_config_file)
+      # create the ES query based on the hosts list
 
-    # setup the search configuration
-    # execute the query on the current ES client => create and save new corpus
-    @fetcher.search_and_save(
-      category: category,
-      indexes: @conf[:extract][:esquery][:index],
-      types: @conf[:extract][:esquery][:type],
-      source: @conf[:extract][:esquery][:source],
-      query: @query,
-      min_nchars: @conf[:extract][:esquery][:min_nchars],
-      output: output_data_file,
-    )
+      [:lang, :query_filter].each do |arg|
+        raise Xi::ML::Error::ConfigError, "Missing argument extract[#{arg}]" \
+          unless @conf[:extract].key?(arg)
+      end
+
+      @query = Xi::ML::Extract::Query.new(input_config_file,
+        @conf[:extract][:lang], @conf[:extract][:query_filter])
+
+      # display the generated sub_hosts
+      Xi::ML.logger.info('The urls/domains lists provided to data fetcher:')
+      @query.hosts.each_with_index do |sub_hosts, index|
+        Xi::ML.logger.info("#{index + 1}: #{sub_hosts.inspect}")
+      end
+
+      # setup the search configuration
+      # execute the query on the ES client => create and save new corpus
+      @fetcher.search_and_save(
+        category: category.to_s,
+        indexes: @conf[:extract][:esquery][:index],
+        types: @conf[:extract][:esquery][:type],
+        source: @conf[:extract][:esquery][:source],
+        queries: @query.rules,
+        min_nchars: @conf[:extract][:esquery][:min_nchars],
+        limit: @conf[:extract][:esquery][:limit],
+        output: output_data_file,
+      )
+    else
+      # setup the search configuration
+      # extract all data from the ES client => create and save new corpus
+      @fetcher.search_and_save(
+        category: category.to_s,
+        indexes: @conf[:extract][:esquery][:index],
+        types: @conf[:extract][:esquery][:type],
+        source: @conf[:extract][:esquery][:source],
+        min_nchars: @conf[:extract][:esquery][:min_nchars],
+        limit: @conf[:extract][:esquery][:limit],
+        output: output_data_file,
+      )
+    end
   end
 end
 
@@ -218,14 +241,21 @@ end
 if @conf[:execution].include?(:build)
   Xi::ML.logger.info('Build subsets')
 
+  shuffle = @conf[:build].key?(:shuffle) ? @conf[:build][:shuffle] : true
+  limit = @conf[:build].key?(:limit) ? @conf[:build][:limit] : nil
+
   @conf[:classes].each do |category|
-    input_file = @local['data'][category]['extracted']
-    output_files_hash = @local['data'][category]['divided']
+    input_file = @local[:data][category][:extracted]
+    output_files_hash = @local[:data][category][:divided]
 
-    Xi::ML.logger.info("Build #{category} train/dev/test corpus")
+    if File.readable?(input_file)
+      Xi::ML.logger.info("Build #{category} train/dev/test corpus")
 
-    @cb = Xi::ML::Build::CorpusBuilder.new(input_file)
-    @cb.build(output_files_hash, @conf[:build][:division])
+      @cb = Xi::ML::Build::CorpusBuilder.new(input_file, shuffle)
+      @cb.build(output_files_hash, @conf[:build][:division], limit)
+    else
+      Xi::ML.logger.warn("File #{input_file} not found")
+    end
   end
 end
 
@@ -242,14 +272,17 @@ if @conf[:execution].include?(:clean)
 
     @conf[:classes].each do |category|
 
-      %w[train dev test].each do |subset|
-        input = @local['data'][category]['divided'][subset]
-        output = @local['data'][category]['preprocessed'][pname.to_s][subset]
+      [:train, :dev, :test].each do |subset|
+        input_file = @local[:data][category][:divided][subset]
+        output_file = @local[:data][category][:preprocessed][pname][subset]
 
-        Xi::ML.logger.info(
-          "Preprocess #{category}-#{subset} corpus: method=#{pname.to_s}")
-
-        @cc.clean(input, output)
+        if File.readable?(input_file)
+          Xi::ML.logger.info(
+            "Preprocess #{category}-#{subset} corpus: method=#{pname.to_s}")
+          @cc.clean(input_file, output_file)
+        else
+          Xi::ML.logger.warn("File #{input_file} not found")
+        end
       end
     end
   end

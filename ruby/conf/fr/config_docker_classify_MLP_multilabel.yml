@@ -18,5 +18,5 @@
     :tfidf: /usr/share/xi-ml/td/models/model_TFIDF.json
     :lsi: /usr/share/xi-ml/td/models/model_LSI.bin
 :classify:
-  :name: :LogisticRegression
-  :file: /usr/share/xi-ml/td/models/model_LR-multiclass_3c.json
+  :name: :MLPClassifier
+  :file: /usr/share/xi-ml/td/models/model_MLP-multilabel_3c.json
