@@ -80,26 +80,29 @@ end
     if @conf[:execution].include?(arg) && !@conf.key?(arg)
 end
 
+subsets = @conf.key?(:subsets) ? @conf[:subsets] : [:test]
 
 #======================================================================
 # Set version and base resources directory variables
 #======================================================================
 
 ddata = @conf[:res]
+classif_names = @conf.key?(:classify) ? [@conf[:classify][:name]] : []
 
 # paths for data: extracted, divided, preprocessed
-@local = Xi::ML::Tools::PathGenerator.new(ddata, @conf[:classes],
-  %w[train dev test],
+@local = Xi::ML::Tools::PathGenerator.new(
+  ddata,
+  @conf[:classes],
+  subsets,
   [@conf[:preprocess]],
   [@conf[:transform][:name]],
-  [@conf[:classify][:name]])
+  classif_names,
+)
 
 
 #======================================================================
 # Preload models
 #======================================================================
-
-Xi::ML.logger.info('Load models')
 
 if @conf[:execution].include?(:transform) && @conf.key?(:transform)
   @transformer = Xi::ML::Transform::Transformer.new(
@@ -117,18 +120,22 @@ end
 #======================================================================
 
 if @conf[:execution].include?(:transform)
-  @conf[:classes].each do |category|
-    input_file = @local.get_preprocessed_file(
-      category, 'test', @conf[:preprocess])
+  subsets.each do |subset|
+    @conf[:classes].each do |category|
+      input_file = @local.get_preprocessed_file(
+        category, subset, @conf[:preprocess])
 
-    output_file = @local.get_transformed_file(
-      category, 'test', @conf[:transform][:name], @conf[:preprocess])
+      output_file = @local.get_transformed_file(
+        category, subset, @conf[:transform][:name], @conf[:preprocess])
 
-    Xi::ML.logger.info("Transform #{category} test documents")
+      if File.readable?(input_file) && !File.readable?(output_file)
+        Xi::ML.logger.info("Transform #{category} #{subset} documents")
 
-    @timer = Xi::ML::Tools::Timer.new()
-    @transformer.store_transformation(input_file, output_file)
-    @timer.stop_timer('Finished transformation')
+        @timer = Xi::ML::Tools::Timer.new()
+        @transformer.store_transformation(input_file, output_file)
+        @timer.stop_timer('Finished transformation')
+      end
+    end
   end
 end
 
@@ -138,27 +145,31 @@ end
 #======================================================================
 
 if @conf[:execution].include?(:classify)
-  @conf[:classes].each do |category|
-    input_file = @local.get_transformed_file(
-      category, 'test',
-      @conf[:transform][:name], @conf[:preprocess])
+  subsets.each do |subset|
+    @conf[:classes].each do |category|
+      input_file = @local.get_transformed_file(
+        category, subset,
+        @conf[:transform][:name], @conf[:preprocess])
 
-    output_file = @local.get_classified_file(
-      category, 'test',
-      @conf[:classify][:name], @conf[:transform][:name], @conf[:preprocess])
+      output_file = @local.get_classified_file(
+        category, subset,
+        @conf[:classify][:name], @conf[:transform][:name], @conf[:preprocess])
 
 
-    Xi::ML.logger.info("Classify #{category} test documents")
+      if File.readable?(input_file) && !File.readable?(output_file)
+        Xi::ML.logger.info("Classify #{category} #{subset} documents")
 
-    @timer = Xi::ML::Tools::Timer.new()
-    @classifier.store_classification(input_file, output_file)
-    @timer.stop_timer('Finished classification')
+        @timer = Xi::ML::Tools::Timer.new()
+        @classifier.store_classification(input_file, output_file)
+        @timer.stop_timer('Finished classification')
+      end
+    end
   end
 end
 
 
 #======================================================================
-# Evaluate classification
+# Evaluate classification on test data
 #======================================================================
 
 if @conf[:execution].include?(:evaluate)

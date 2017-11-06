@@ -16,7 +16,7 @@ class Xi::ML::Tools::Timer
     @start_time = Time.now
   end
 
-  def stop_timer(msg = '')
+  def stop_timer(msg = 'Finished execution')
     @elapsed_time = '%.3f' % (Time.now - @start_time)
     @logger.info("#{msg} in #{@elapsed_time} seconds")
   end

@@ -3,6 +3,7 @@
 
 
 require 'optparse'
+require 'ruby-prof'
 
 $LOAD_PATH.unshift 'lib/'
 require 'xi/ml'
@@ -22,10 +23,12 @@ Xi::ML::Tools::Logger.global_level = Log4r::INFO
 @options = {}
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Object: transform json corpora using known LSI model\n"
-  opts.banner << 'Usage: ./bin/xi-ml-transformdata [options]'
+  opts.banner = 'Object: profile preprocessing, transformation, classification'
+  opts.banner << "\nUsage: ./bin/xi-ml-profiler [options]"
 
+  opts.on('-i INPUT', '--input INPUT', 'Input file') {|v| @options[:input] = v }
   opts.on('-c CONF', '--conf CONF', 'Config file') {|v| @options[:conf] = v }
+  opts.on('-o OT', '--output OT', 'Output folder') {|v| @options[:output] = v }
   opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
@@ -34,18 +37,21 @@ end
 
 begin
   parser.parse!
-  abort "[Error] Empty argument(s)\n\n#{parser}" if @options[:conf].nil?
+  abort "[Error] Empty argument(s)\n\n#{parser}" \
+    if @options[:conf].nil? || @options[:input].nil? || @options[:output].nil?
 rescue OptionParser::InvalidOption => e1
   abort "[Error] #{e1.message.capitalize}\n\n#{parser}"
 rescue OptionParser::MissingArgument => e2
   abort "[Error] #{e2.message.capitalize}\n\n#{parser}"
 end
 
+Xi::ML::Tools::Utils.check_file_readable!(@options[:input])
 Xi::ML::Tools::Utils.check_file_readable!(@options[:conf])
+Xi::ML::Tools::Utils.create_folder(@options[:output])
 
 
 #======================================================================
-# Load configuration
+# Load and check configuration
 #======================================================================
 
 begin
@@ -57,64 +63,51 @@ rescue => e
   abort "[Error] Bad format of YAML file '#{@options[:conf]}' : #{e.message}"
 end
 
-# @conf[:res]         which data to process
-# @conf[:classes]     process documents of classes 'classes'
-# @conf[:preprocess]  which preprocessing technique to evaluate
+# @conf[:clean]       which cleaners to apply on data
 # @conf[:transform]   which transformation models to apply on preprocessed data
+# @conf[:classify]    which classifier model to apply on transformed data
 
-Xi::ML.logger.info("Processing current configuration:\n#{PP.pp(@conf, '')}")
-
-
-#======================================================================
-# Checkup config options
-#======================================================================
-
-[:res, :classes, :preprocess, :transform].each do |arg|
+[:clean, :transform, :classify].each do |arg|
   abort "Missing argument '#{arg}'" unless @conf.key?(arg)
 end
 
-
-#======================================================================
-# Set version and base resources directory variables
-#======================================================================
-
-ddata = @conf[:res]
-
-# paths for data: extracted, divided, preprocessed
-@local = Xi::ML::Tools::PathGenerator.new(ddata, @conf[:classes],
-  %w[train dev test],
-  [@conf[:preprocess]],
-  [@conf[:transform][:name]],
-  []
-)
+Xi::ML.logger.info("Processing current configuration:\n#{PP.pp(@conf, '')}")
 
 
 #======================================================================
 # Preload models
 #======================================================================
 
-Xi::ML.logger.info('Load transformation models')
+Xi::ML.logger.info('Load models')
 
+@cleaner = Xi::ML::Preprocess::CorpusCleaner.new(@conf[:clean])
 @transformer = Xi::ML::Transform::Transformer.new(
   @conf[:transform][:name], @conf[:transform][:files])
+@classifier = Xi::ML::Classify::Classifier.new(
+  @conf[:classify][:name], @conf[:classify][:file])
 
 
 #======================================================================
-# Transform documents
+# Preprocess, transform and classify one document at a time
 #======================================================================
 
-@conf[:classes].each do |category|
-  ['train', 'dev', 'test'].each do |subset|
-    input_file = @local.get_preprocessed_file(
-      category, subset, @conf[:preprocess])
+Xi::ML.logger.info('Clean, transform and classify documents')
 
-    output_file = @local.get_transformed_file(
-      category, subset, @conf[:transform][:name], @conf[:preprocess])
+# start the profiler
+RubyProf.start()
+RubyProf.pause()
 
-    Xi::ML.logger.info("Transform #{category}-#{subset} documents")
+File.read(@options[:input]).each_line do |line|
+  doc = line.chomp()
 
-    @timer = Xi::ML::Tools::Timer.new()
-    @transformer.store_transformation(input_file, output_file)
-    @timer.stop_timer('Finished transformation')
-  end
+  RubyProf.resume()
+  clean_doc = @cleaner.clean_doc(doc)
+  trans_doc = @transformer.transform_doc(clean_doc)
+  _prediction = @classifier.classify_doc(trans_doc)
+  RubyProf.pause()
 end
+
+# stop the profiler and store its analysis
+result = RubyProf.stop()
+printer = RubyProf::MultiPrinter.new(result)
+printer.print(path: @options[:output])

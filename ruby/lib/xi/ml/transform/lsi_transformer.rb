@@ -5,7 +5,7 @@
 # Document transformer (feature extraction):
 # apply 'gensim' transformation model(s) on preprocessed documents
 class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
-  attr_reader :dictionary, :tfidf_model, :lsi_model, :n_topics
+  attr_reader :dictionary, :tfidf_params, :lsi_params, :n_topics
 
   MODELS = [:dict, :tfidf, :lsi].freeze
 
@@ -22,40 +22,26 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
     @logger.info("Loading already trained LSI models from #{trans_files}")
 
     @timer.start_timer()
-    trans_files.each{|trans_name, trans_file| load(trans_name, trans_file) }
-    @timer.stop_timer('Models loaded')
-  end
-
-  # Load the pre-trained models
-  #
-  # @param name [String] the model's name
-  # @param file [String] the file storing the model
-  def load(name, file)
-    return if file == ''
-    Xi::ML::Tools::Utils.check_file_readable!(file)
-
-    case name
-    when :dict
-      @logger.info('Load dictionary')
-      load_dict(file)
-    when :tfidf
-      @logger.info('Load TF-IDF model')
-      load_tfidf(file)
-    when :lsi
-      @logger.info('Load LSI model')
-      load_lsi(file)
+    trans_files.each do |trans_name, trans_file|
+      Xi::ML::Tools::Utils.check_file_readable!(trans_file)
+      @logger.info("Load #{trans_name}")
+      self.__send__("load_#{trans_name}", trans_file)
     end
+    @timer.stop_timer('Models loaded')
   end
 
   # Private method to load the dictionary
   def load_dict(file)
-    @dictionary = {}
-
     begin
-      File.open(file, 'r').each_line do |line|
-        id, word = line.split(' ')
-        @dictionary[word] = id.to_i unless id.nil? && word.nil?
-      end
+      @dictionary = JSON.load(File.read(file))
+
+      raise Xi::ML::Error::ConfigError,
+        "No data in JSON file '#{file}'" \
+        if @dictionary.empty?
+
+      raise Xi::ML::Error::ConfigError, \
+        "JSON object stored in '#{file}' is not a Hash" \
+        unless @dictionary.is_a?(Hash)
     rescue => e
       raise Xi::ML::Error::CaughtException, \
         "Exception encountered when reading file '#{file}': #{e.message}"
@@ -63,30 +49,35 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
   end
 
   # Private method to load the TF-IDF pre-trained model
+  # an array of IDF weights (array index == word_id)
   def load_tfidf(file)
-    @tfidf_model = {}
-
     begin
-      @tfidf_model = JSON.load(File.read(file))
-      @tfidf_model = @tfidf_model.map{|k, v| [k.to_i, v.to_f] }.to_h
+      tfidf_array = JSON.load(File.read(file))
 
       raise Xi::ML::Error::ConfigError,
         "No data in JSON file '#{file}'" \
-        if @tfidf_model.empty?
+        if tfidf_array.empty?
 
       raise Xi::ML::Error::ConfigError, \
-        "JSON object stored in '#{file}' is not a HASH" \
-        unless @tfidf_model.is_a?(Hash)
+        "JSON object stored in '#{file}' is not an Array" \
+        unless tfidf_array.is_a?(Array)
     rescue => e
       raise Xi::ML::Error::CaughtException, \
         "Bad format of JSON file '#{file}' : #{e.message}"
     end
+
+    @tfidf_params = Numo::DFloat.new(tfidf_array.size)
+    @tfidf_params.store(tfidf_array)
   end
 
   # Private method to load the LSI pre-trained model
+  # an array of LSI topic weights (array index == word_id)
   def load_lsi(file)
-    @lsi_model = Xi::ML::Tools::ModelBinarizer.revert(file)
-    @n_topics = @lsi_model.values[0].size
+    lsi_array = Xi::ML::Tools::ModelBinarizer.revert(file)
+    @n_topics = lsi_array[0].size
+
+    @lsi_params = Numo::DFloat.new(lsi_array.size, @n_topics)
+    @lsi_params.store(lsi_array)
   end
 
   # Transform the given document into the LSI format
@@ -110,36 +101,16 @@ class Xi::ML::Transform::LSITransformer < Xi::ML::Tools::Component
     # list of word ids
     ids = freq.keys
 
-    # compute TF-IDF features
-    tfidf_weights = ids.map{|id| freq[id] * @tfidf_model[id] }
-    tfidf_weights = normalize_weights(tfidf_weights)
+    # compute and normalize TF-IDF features
+    tfidf_weights = Numo::DFloat[*freq.values] * @tfidf_params.slice(ids)
+    tfidf_weights /= Math.sqrt((tfidf_weights**2).sum)
 
     # recover LSI weights for current document
-    lsi_weights = ids.map{|id| @lsi_model[id] }
+    lsi_weights = @lsi_params.slice(ids, (0..-1))
 
     # compute LSI features
-    lsi_features = Array.new(@n_topics, 0)
-
-    @n_topics.times do |topic_id|
-      ids.size.times do |word_index|
-        lsi_features[topic_id] += \
-          tfidf_weights[word_index] * lsi_weights[word_index][topic_id]
-      end
-    end
-
-    lsi_features
+    (tfidf_weights.dot(lsi_weights)).to_a
   end
 
-  # compute the TF-IDF l2 norm on given weights
-  def normalize_weights(weights)
-    # compute norm = sqrt(sum_i (x_i * x_i))
-    norm = 0
-    weights.each {|weight| norm += weight**2 }
-    norm = Math.sqrt(norm)
-
-    # normalize by norm
-    weights.map{|weight| weight / norm }
-  end
-
-  private :load_dict, :load_tfidf, :load_lsi, :normalize_weights
+  private :load_dict, :load_tfidf, :load_lsi
 end

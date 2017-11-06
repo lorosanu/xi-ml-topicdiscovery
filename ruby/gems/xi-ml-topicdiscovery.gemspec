@@ -22,18 +22,17 @@ Gem::Specification.new do |spec|
   spec.executables      = %w[
                           xi-ml-preparedata
                           xi-ml-classify
-                          xi-ml-transformdata
-                          xi-ml-evaluatedata]
+                          xi-ml-evaluatedata
+                          xi-ml-convertmodel
+                          xi-ml-profiler]
 
   spec.add_runtime_dependency 'json', '~> 1.8', '>= 1.8.1'
   spec.add_runtime_dependency 'log4r', '~> 1.1', '>= 1.1.10'
-  spec.add_runtime_dependency 'unicode_utils', '~> 1.4', '>= 1.4.0'
-  spec.add_runtime_dependency 'narray', '~> 0.6.1', '>= 0.6.1.2'
+  spec.add_runtime_dependency 'unicode', '~> 0.4', '>= 0.4.4'
   spec.add_runtime_dependency 'elasticsearch', '~> 1.1', '>= 1.1.0'
 
-  # FIXME: replace 'narray' lib with 'numo/narray' lib
-  # when it will no longer be under development
-  # spec.add_runtime_dependency 'numo-narray', ...
+  # FIXME: check for updates of 'numo/narray' lib (still under development)
+  spec.add_runtime_dependency 'numo-narray', '= 0.9.0.9'
 
   # FIXME: to be added when NLP will be needed
   # spec.add_runtime_dependency 'xi-nlp', '~> 2.0', '>= 2.0.1'

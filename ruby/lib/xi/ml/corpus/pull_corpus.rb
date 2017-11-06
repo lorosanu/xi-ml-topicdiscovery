@@ -7,7 +7,7 @@
 # - is loaded from input json file
 # - mainly used to load existing corpus, extract sub-sets of documents
 class Xi::ML::Corpus::PullCorpus < Xi::ML::Tools::Component
-  attr_reader :input, :content
+  attr_reader :input, :content, :structure
 
   # Initialize the corpus
   #
@@ -19,13 +19,12 @@ class Xi::ML::Corpus::PullCorpus < Xi::ML::Tools::Component
 
     @input = input
     @content = []
+    @structure = []
 
     @timer.start_timer
 
     begin
-      File.open(@input, 'r').each_line do |line|
-        @content << JSON.load(line)
-      end
+      File.open(@input, 'r').each_line{|line| @content << JSON.load(line) }
     rescue => e
       raise Xi::ML::Error::CaughtException, \
         "Exception encountered when reading JSON '#{@input}' file: #{e.message}"
@@ -35,6 +34,8 @@ class Xi::ML::Corpus::PullCorpus < Xi::ML::Tools::Component
 
     raise Xi::ML::Error::DataError, "Empty data in JSON file '#{@input}'" \
       if @content.empty?
+
+    @structure = @content[0].keys.dup
   end
 
   # Generate and return 'n' samples of documents
@@ -42,6 +43,7 @@ class Xi::ML::Corpus::PullCorpus < Xi::ML::Tools::Component
   # @param n [Integer] the samples size
   # @return [Array] a list of n random documents
   def sample(n)
+    return @content if n >= @content.size
     samples = n > 0 ? @content.sample(n) : []
     samples
   end

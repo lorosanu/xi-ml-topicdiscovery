@@ -10,8 +10,6 @@ class Xi::ML::Preprocess::Cleaner::WhitespaceCleaner \
   end
 
   def clean(text)
-    ctext = text.gsub(/\s+/, ' ')
-    ctext.strip!
-    ctext
+    text.split.join(' ')
   end
 end

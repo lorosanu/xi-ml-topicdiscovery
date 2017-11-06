@@ -12,11 +12,11 @@
   - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
     :args:
 :transform:
-  :name: LSI
+  :name: :LSI
   :files:
-    :dict: /tmp/ml-resources/dictionary.txt
-    :tfidf: /tmp/ml-resources/model_TFIDF.json
-    :lsi: /tmp/ml-resources/model_LSI.bin
+    :dict: /usr/share/xi-ml/td/models/dictionary.json
+    :tfidf: /usr/share/xi-ml/td/models/model_TFIDF.json
+    :lsi: /usr/share/xi-ml/td/models/model_LSI.bin
 :classify:
-  :name: MLPClassifier
-  :file: /tmp/ml-resources/model_MLP-multiclass-3c.json
+  :name: :MLPClassifier
+  :file: /usr/share/xi-ml/td/models/model_MLP-multiclass_3c.json

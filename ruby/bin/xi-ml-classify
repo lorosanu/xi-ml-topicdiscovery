@@ -155,8 +155,10 @@ if [:clean, :transform, :classify] == @conf[:execution]
     trans_doc = @transformer.transform_doc(clean_doc)
     prediction = @classifier.classify_doc(trans_doc)
 
+    prediction[:probas] = prediction[:probas].map{|k, v| [k, v.round(3)] }.to_h
+
     @timer.stop_timer("Predicted class #{prediction[:category].ljust(9)} "\
-      + "(prob=#{prediction[:probas]}) "\
-      + "for document of #{doc.split(' ').size} words")
+      + "(#{prediction[:probas]}) "\
+      + "for document of #{doc.split.size.to_s.rjust(3)} words")
   end
 end

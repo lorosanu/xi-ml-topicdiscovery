@@ -4,7 +4,8 @@
 
 # Class displaying and storing the statistics of given prediction
 class Xi::ML::Classify::PredictionStatistics < Xi::ML::Tools::Component
-  attr_reader :categories, :data_files, :stats, :n_correct, :n_total
+  attr_reader :categories, :data_files, :stats, \
+    :confusion_matrix, :real_categories, :predicted_categories
 
   # Initialize
   #
@@ -14,73 +15,94 @@ class Xi::ML::Classify::PredictionStatistics < Xi::ML::Tools::Component
     super()
 
     @stats = {}
-    @data_files = data_files.clone
-    @categories = categories.clone
+    @data_files = data_files.dup
+    @categories = categories.dup
   end
 
+  # Compute the accuracy, precision and recall statistics;
   # Save statistics to json file
   #
   # @param output [String] the file where to store statistics
   def save_stats(output)
     @logger.info("Save statistics to '#{output}' file")
 
-    compute_stats()
+    compute_confusion_matrix()
+    compute_accuracy_stats()
+    compute_pr_stats()
 
     Xi::ML::Tools::Utils.create_path(output)
     File.open(output, 'w') {|stream| stream.puts(JSON.pretty_generate(@stats)) }
   end
 
-  # Compute the accuracy, precision and recall statistics
-  def compute_stats
-    @stats = {}
+  # Compute the confusion matrix
+  def compute_confusion_matrix
+    @cm = {}
+    @cm['total'] = Hash.new(0)
 
-    compute_accuracy_stats()
-    compute_pr_stats()
-  end
+    @real_categories = []
+    @predicted_categories = []
 
-  # Compute the accuracy stats
-  def compute_accuracy_stats
-    @n_correct, @n_total = {}, {}
-
-    # init stats dictionary
-    # - number of total documents in class 'category'
-    # - number of correctly classified documents in class 'category'
-    @categories.each do |category|
-      @n_total[category] = 0
-      @n_correct[category] = 0
-    end
-
-    valid_format = false
-
-    # count correct predictions in given data files
     @data_files.each do |input_file|
       sc = Xi::ML::Corpus::StreamCorpus.new(input_file)
 
       sc.each_doc do |doc|
         if doc['category'] && doc['season']
-          valid_format = true
-
           real_category = doc['category']
           predicted_category = doc['season']
 
-          @n_total[real_category] += 1
-          @n_correct[real_category] += 1 if predicted_category == real_category
+          @real_categories << real_category \
+            unless @real_categories.include?(real_category)
+
+          @predicted_categories << predicted_category \
+            unless @predicted_categories.include?(predicted_category)
+
+          @cm[real_category] = Hash.new(0) unless @cm.key?(real_category)
+          @cm[real_category][predicted_category] += 1
+          @cm[real_category]['total'] += 1
+
+          @cm['total'][predicted_category] += 1
+          @cm['total']['total'] += 1
         end
       end
     end
 
-    @logger.warn("Missing fields 'category' or 'season' in input data") \
-      unless valid_format
+    @real_categories.sort!
+    @predicted_categories.sort!
 
+    display_confusion_matrix()
+  end
+
+  def display_confusion_matrix
+    rcategories = @real_categories.dup << 'total'
+    pcategories = @predicted_categories.dup << 'total'
+
+    n = (rcategories | pcategories).map{|x| x.size }.max + 3
+
+    display = ' ' * n
+    pcategories.each{|pcat| display << pcat.rjust(n) }
+
+    display << "\n"
+    rcategories.each do |rcat|
+      display << rcat.ljust(n)
+      pcategories.each{|pcat| display << @cm[rcat][pcat].to_s.rjust(n) }
+      display << "\n"
+    end
+
+    @logger.info("Confusion matrix and marginals\n#{display}")
+  end
+
+  # Compute the accuracy stats
+  def compute_accuracy_stats
     gc, gt = 0, 0
-    # print stats by class
-    @categories.each do |category|
-      total = @n_total[category]
-      correct = @n_correct[category]
-      avg_accuracy = div(correct, total)
 
-      @logger.info("Correctly classified documents of class=#{category}: "\
-        "#{correct} / #{total} = #{avg_accuracy}")
+    # print stats by class
+    @real_categories.each do |cat|
+      correct = @cm[cat][cat] ? @cm[cat][cat] : 0
+      total = @cm[cat]['total'] ? @cm[cat]['total'] : 0
+      avg_acc = percentage(correct, total)
+
+      @logger.info("Correctly classified '#{cat}' documents : "\
+        "#{correct} / #{total} = #{avg_acc} %")
 
       # global counts
       gc += correct
@@ -88,77 +110,63 @@ class Xi::ML::Classify::PredictionStatistics < Xi::ML::Tools::Component
     end
 
     # global accuracy
-    global_accuracy = div(gc, gt)
-
-    # print global stats
-    @logger.info("Correctly classified documents: #{gc} / #{gt} = "\
-      "#{global_accuracy}")
+    g_acc = percentage(gc, gt)
+    @logger.info("Correctly classified documents: #{gc} / #{gt} = #{g_acc} %")
 
     # store 'global accuracy' stat
-    @stats['global-accuracy'] = global_accuracy
+    @stats[:global_accuracy] = g_acc
   end
 
   # Compute precision and recall statistics
   def compute_pr_stats
     # recall & precision stats for each class
-    # true-positive, false-negative, false-positive, true-negative ratios
     precision, recall = {}, {}
-    tp, fn, fp, tn = {}, {}, {}, {}
 
-    @categories.each do |main_cat|
-      tp[main_cat] = @n_correct[main_cat]
-      fn[main_cat] = @n_total[main_cat] - @n_correct[main_cat]
+    @real_categories.each do |cat|
+      correct = @cm[cat][cat] ? @cm[cat][cat] : 0
+      ptotal = @cm['total'][cat] ? @cm['total'][cat] : 0
+      rtotal = @cm[cat]['total'] ? @cm[cat]['total'] : 0
 
-      tn[main_cat] = 0
-      fp[main_cat] = 0
-      @categories.each do |other_cat|
-        if main_cat != other_cat
-          tn[main_cat] += @n_correct[other_cat]
-          fp[main_cat] += (@n_total[other_cat] - @n_correct[other_cat])
-        end
-      end
+      precision[cat] = percentage(correct, ptotal)
+      recall[cat] = percentage(correct, rtotal)
 
-      precision[main_cat] = div(tp[main_cat], tp[main_cat] + fp[main_cat])
-      recall[main_cat] = div(tp[main_cat], tp[main_cat] + fn[main_cat])
+      # store P - R stats
+      @stats[cat] = {
+        precision: precision[cat],
+        recall: recall[cat],
+      }
     end
 
-    # store P - R stats
-    @categories.each do |category|
-      @stats[category] = {}
-      @stats[category]['precision'] = precision[category]
-      @stats[category]['recall'] = recall[category]
-    end
-
-    # log the confusion matrix for each class
-    @categories.each do |category|
-      tpc = tp[category]
-      fnc = fn[category]
-      fpc = fp[category]
-      tnc = tn[category]
+    # display the 1-versus-rest confusion matrix for each class
+    @real_categories.each do |cat|
+      tp = @cm[cat][cat] ? @cm[cat][cat] : 0
+      fn = @cm[cat]['total'] - tp
+      fp = @cm['total'][cat] - tp
+      tn = @cm['total']['total'] - tp - fn - fp
 
       cmatrix = '=' * 40 << "\n"
-      cmatrix << "Class=#{category}\n"
+      cmatrix << "Class=#{cat}\n"
       cmatrix << '=' * 40 << "\n"
       cmatrix << "      | declare H1 |  declare H0 |\n"
-      cmatrix << "is H1 | #{tpc.to_s.rjust(10)} | #{fnc.to_s.rjust(11)} |\n"
-      cmatrix << "is H0 | #{fpc.to_s.rjust(10)} | #{tnc.to_s.rjust(11)} |\n"
+      cmatrix << "is H1 | #{tp.to_s.rjust(10)} | #{fn.to_s.rjust(11)} |\n"
+      cmatrix << "is H0 | #{fp.to_s.rjust(10)} | #{tn.to_s.rjust(11)} |\n"
       cmatrix << '-' * 40 << "\n"
-      cmatrix << "Precision = #{precision[category]}\n"
-      cmatrix << "Recall    = #{recall[category]}\n"
+      cmatrix << "Precision = #{precision[cat]} %\n"
+      cmatrix << "Recall    = #{recall[cat]} %\n"
 
-      @logger.info('Confusion matix, precision and recall stats ' \
-        + "for the #{category} class: \n#{cmatrix}")
+      @logger.info("Confusion matix, precision, recall for #{cat}\n#{cmatrix}")
     end
   end
 
-  # Own div method to account for zero division error
-  def div(x, y)
+  # Own percentage method to account for zero division error
+  def percentage(x, y)
     if y == 0
       @logger.warn('Zero division error')
-      return 0
+      return 0.0
     end
-    '%.2f' % ((x.to_f / y) * 100)
+    ((x.to_f / y) * 100).round(2)
   end
 
-  private :div, :compute_stats, :compute_accuracy_stats, :compute_pr_stats
+  private :compute_pr_stats, :compute_accuracy_stats, :compute_pr_stats, \
+    :percentage
 end

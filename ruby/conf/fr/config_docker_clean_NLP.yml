@@ -4,5 +4,13 @@
   - :name: Xi::ML::Preprocess::Cleaner::NLPCleaner
     :args:
       :lang: fr
-      :filter: Xi::ML::Preprocess::Filter::OnlyLemmasFilter
+      :filter: Xi::ML::Preprocess::Filter::PosNVLemmasFilter
+  - :name: Xi::ML::Preprocess::Cleaner::PunctCleaner
+    :args:
+  - :name: Xi::ML::Preprocess::Cleaner::DigitCleaner
+    :args:
+  - :name: Xi::ML::Preprocess::Cleaner::LowercaseCleaner
+    :args:
+  - :name: Xi::ML::Preprocess::Cleaner::WhitespaceCleaner
+    :args:
 
