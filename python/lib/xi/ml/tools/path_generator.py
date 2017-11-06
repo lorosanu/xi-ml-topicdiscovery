@@ -36,8 +36,7 @@ class PathGenerator:
     def preprocessed_file(self, category, subset, ptype):
         """
         Return the preprocessed data files
-        for given category, subset and preprocessing.
-        File should already exist.
+        for given category, subset and preprocessing
         """
 
         filename = self.paths['data'][category]['preprocessed'][ptype][subset]
@@ -47,13 +46,12 @@ class PathGenerator:
     def transformed_file(self, category, subset, ttype, ptype):
         """
         Return the transformed data file
-        for given category, subset, transformation and preprocessing.
+        for given category, subset, transformation and preprocessing
         """
 
         ctrans = "{}_{}".format(ttype, ptype)
         filename = self.paths['data'][category]['transformed'][ctrans][subset]
 
-        utils.create_path(filename)
         return filename
 
     def classified_file(
@@ -63,7 +61,7 @@ class PathGenerator:
         """
         Return the classified data file
         for given category, subset, classifier, training type, data size,
-        transformation and preprocessing.
+        transformation and preprocessing
         """
 
         if csize == -1:
@@ -75,14 +73,13 @@ class PathGenerator:
         filename = os.path.join(
             folder, classif, "{}_{}.json".format(category, subset))
 
-        utils.create_path(filename)
         return filename
 
     def stats_file(self, cname, ctype, traintype, csize, ttype, ptype):
         """
         Return the stats file
         for given classifier, training type, data size,
-        transformation and preprocessing.
+        transformation and preprocessing
         """
 
         if csize == -1:
@@ -95,13 +92,11 @@ class PathGenerator:
         classif_file = "{}_{}.json".format(traintype, str(csize))
         filename = os.path.join(folder, classif_file)
 
-        utils.create_path(filename)
         return filename
 
     def preprocessed_files(self, ptype, subset):
         """
-        Return the list of preprocessed 'subset' data files for each category.
-        Files should already exist.
+        Return the list of preprocessed 'subset' data files for each category
         """
 
         files = []
@@ -117,8 +112,7 @@ class PathGenerator:
 
     def transformed_files(self, ttype, ptype, subset):
         """
-        Return the list of transformed 'subset' data files for each category.
-        Files should already exist.
+        Return the list of transformed 'subset' data files for each category
         """
 
         files = []
@@ -138,8 +132,7 @@ class PathGenerator:
             self, cname, ctype, traintype, csize, ttype, ptype, subset):
 
         """
-        Return the list of classified 'subset' data files for each category.
-        Files should already exist.
+        Return the list of classified 'subset' data files for each category
         """
 
         files = []
@@ -158,43 +151,36 @@ class PathGenerator:
 
     def dictionary(self, ptype):
         """
-        Return the dictionary's filename given the preprocessing type.
-        File should be created later on.
+        Return the dictionary's filename given the preprocessing type
         """
 
-        utils.create_path(self.paths['dictionary'][ptype])
         return self.paths['dictionary'][ptype]
 
     def transformation_model(self, model, ttype, ptype):
         """
-        Return the model's filename given the transformation and preprocessing.
-        File should be created later on.
+        Return the model's filename given the transformation and preprocessing
         """
 
         ctrans = "{}_{}".format(ttype, ptype)
         folder = self.paths['models']['trans'][ctrans]
         filename = "model_{}.bin".format(model)
 
-        utils.create_folder(folder)
         return os.path.join(folder, filename)
 
     def transformation_topics(self, ttype, ptype):
         """
         Return the model topics filename
-        given the transformation and preprocessing.
-        File should be created later on.
+        given the transformation and preprocessing
         """
 
         ctrans = "{}_{}".format(ttype, ptype)
         topics_file = self.paths['models']['trans_topics'][ctrans]
 
-        utils.create_path(topics_file)
         return topics_file
 
     def classification_model(self, ttype, ptype, cname, ctype, train, csize):
         """
-        Return the model's filename given the transformation and preprocessing.
-        File should be created later on.
+        Return the model's filename given the transformation and preprocessing
         """
 
         if csize == -1:
@@ -205,12 +191,12 @@ class PathGenerator:
         folder = self.paths['models']['classif'][cclassif][ctrans]
         filename = "{}_{}.bin".format(train, str(csize))
 
-        utils.create_path(folder)
         return os.path.join(folder, filename)
 
     def _generate_data_files(self):
         """
-        Generate all the data paths for each category, subset, preproc, trans, ...
+        Generate all the data paths for each
+        category, subset, preproc, trans, ...
         """
 
         files = {}
@@ -227,12 +213,10 @@ class PathGenerator:
             folder = os.path.join(self.res, 'data', category, 'extracted')
             file = "{}.json".format(category)
 
-            utils.create_folder(folder)
             files[category]['extracted'] = os.path.join(folder, file)
 
             # divided data
             folder = os.path.join(self.res, 'data', category, 'divided')
-            utils.create_folder(folder)
 
             for subset in self.subsets:
                 file = "{}_{}.json".format(category, subset)
@@ -242,7 +226,6 @@ class PathGenerator:
             for preprocess in self.preproc:
                 folder = os.path.join(
                     self.res, 'data', category, 'preprocessed', preprocess)
-                utils.create_folder(folder)
 
                 files[category]['preprocessed'][preprocess] = {}
                 for subset in self.subsets:
@@ -257,7 +240,6 @@ class PathGenerator:
 
                     folder = os.path.join(
                         self.res, 'data', category, 'transformed', ctrans)
-                    utils.create_folder(folder)
 
                     files[category]['transformed'][ctrans] = {}
                     for subset in self.subsets:
@@ -272,7 +254,6 @@ class PathGenerator:
 
                     folder = os.path.join(
                         self.res, 'data', category, 'p_classified', ctrans)
-                    utils.create_folder(folder)
                     files[category]['classified'][ctrans] = folder
 
         return files
@@ -285,7 +266,6 @@ class PathGenerator:
         files = {}
 
         folder = os.path.join(self.res, 'dictionary')
-        utils.create_folder(folder)
 
         for preprocess in self.preproc:
             file = "dictionary_{}.bin".format(preprocess)
@@ -307,7 +287,6 @@ class PathGenerator:
                 folder = os.path.join(
                     self.res, 'models', 'transformations', ctrans)
 
-                utils.create_folder(folder)
                 folders[ctrans] = folder
 
         return folders
@@ -329,7 +308,6 @@ class PathGenerator:
 
                 folder = os.path.join(
                     self.res, 'models', 'transformations_topics')
-                utils.create_folder(folder)
 
                 files[ctrans] = os.path.join(folder, file)
 
@@ -355,7 +333,6 @@ class PathGenerator:
                         ctrans = "{}_{}".format(transformation, preprocess)
                         folders[classifier][ctrans] = os.path.join(
                             folder, ctrans)
-                        utils.create_folder(folders[classifier][ctrans])
 
         return folders
 
@@ -379,6 +356,5 @@ class PathGenerator:
                         ctrans = "{}_{}".format(transformation, preprocess)
                         folders[classifier][ctrans] = os.path.join(
                             folder, ctrans)
-                        utils.create_folder(folders[classifier][ctrans])
 
         return folders

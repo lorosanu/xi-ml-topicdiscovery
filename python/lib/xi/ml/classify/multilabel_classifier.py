@@ -93,9 +93,9 @@ class MultilabelClassifier(Component):
                 shape = {}
                 shape['name'] = self.name
                 shape['classifier_type'] = 'multilabel'
+                shape['classes'] = list(self.model.classes_)
                 shape['n_classes'] = len(self.model.classes_)
                 shape['n_features'] = len(self.model.coefs_[0])
-                shape['classes'] = list(self.categories)
                 shape['hidden_activation'] = self.model.activation
                 shape['output_activation'] = self.model.out_activation_
 
@@ -105,55 +105,29 @@ class MultilabelClassifier(Component):
 
                 if len(hl_coeffs) != len(hl_intercepts):
                     raise ConfigError(
-                        "Coefficients & intercepts not equally sized {}/{}"
+                        "Hidden coefficients&intercepts not equally sized {}/{}"
                         .format(len(hl_coeffs), len(hl_intercepts)))
 
-                transposed_hidden_layers = []
-                for coeffs, intercepts in zip(hl_coeffs, hl_intercepts):
-                    # transpose coeffs (ex: 300 x 100 => 100 x 300)
-                    transposed = coeffs.T
-                    transposed = [
-                        [float(x) for x in coeffs]
-                        for coeffs in transposed
-                    ]
+                hcoeffs = []
+                for layer in hl_coeffs:
+                    hcoeffs.append([[float(x) for x in cx] for cx in layer])
+                shape['hidden_coeffs'] = hcoeffs
 
-                    # add intercepts (ex: => new shape 100 x 301)
-                    if len(transposed) != len(intercepts):
-                        raise ConfigError(
-                            "Coefficients & intercepts not equally sized {}/{}"
-                            .format(len(transposed), len(intercepts)))
-
-                    for trans_row, intercept in zip(transposed, intercepts):
-                        trans_row.append(intercept)
-
-                    # store all hidden coefficients and intercepts in one list
-                    transposed_hidden_layers.append(transposed)
-
-                shape['hidden_layers'] = list(transposed_hidden_layers)
+                shape['hidden_intercepts'] = \
+                    [[float(x) for x in ix] for ix in hl_intercepts]
 
                 # coefficients & intercepts of output layer
-                output_coefs = self.model.coefs_[-1]
-                output_intercepts = self.model.intercepts_[-1]
+                ocoeffs = self.model.coefs_[-1]
+                ocoeffs = [[float(x) for x in ox] for ox in ocoeffs]
+                ointercepts = self.model.intercepts_[-1]
 
-                transposed_output_coefs = output_coefs.T
-                transposed_output_coefs = [
-                    [float(x) for x in coeffs]
-                    for coeffs in transposed_output_coefs
-                ]
-
-                if len(transposed_output_coefs) != len(output_intercepts):
+                if len(ocoeffs[0]) != len(ointercepts):
                     raise ConfigError(
-                        "Coefficients & intercepts not equally sized {}/{}"
-                        .format(
-                            len(transposed_output_coefs),
-                            len(output_intercepts)))
+                        "Output coefficients&intercepts not equally sized {}/{}"
+                        .format(len(ocoeffs[0]), len(ointercepts)))
 
-                for trans_row, intercept in zip(
-                        transposed_output_coefs,
-                        output_intercepts):
-                    trans_row.append(intercept)
-
-                shape['output_layer'] = list(transposed_output_coefs)
+                shape['output_coeffs'] = ocoeffs
+                shape['output_intercepts'] = list(ointercepts)
             else:
                 self.logger.warning(
                     "Unknown shape for {} classifier (WIP)".format(self.name))

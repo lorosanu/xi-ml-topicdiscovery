@@ -42,7 +42,7 @@ class LoadClassifier(Component):
         """Test the classifier on a new document"""
 
         if not self.prediction_checkups():
-            return ''
+            return {}
 
         categories = list(self.model.classes_)
         features = [float(x) for x in feat]
@@ -57,6 +57,8 @@ class LoadClassifier(Component):
         if isinstance(doc_class, numpy.ndarray):
             doc_class = [categories[index] \
                 for index, val in enumerate(doc_class) if val == 1]
+            if not doc_class:
+                doc_class = [max(doc_proba, key=doc_proba.get)]
 
         prediction = {}
         prediction['category'] = doc_class

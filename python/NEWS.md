@@ -1,5 +1,17 @@
 # News
 
+## Python Xi-ML 0.3.0 - 06/11/2017
+* change shapes of trained models for faster Ruby processing
+* fix computation in prediction stats
+* display more stats in classification plots
+* allow external configuration for the
+  dictionary filter, LSI training, word2vec training
+* add the access to a distributed training of LSI
+* add a plotting script (histogram/scatterplot)
+* update dependencies versions (gensim, sklearn)
+* give more details in README file
+* generate documentation
+
 ## Python Xi-ML 0.2.0 - 08/08/2017
 * add a script allowing to train a color classifier (pixel => colorname)
 * update docker-compose configuration

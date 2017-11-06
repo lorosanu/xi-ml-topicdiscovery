@@ -31,7 +31,7 @@ class TrainTransformer(Component):
         }
     }
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, **kwargs):
         """Initialize the transformation model"""
 
         super().__init__()
@@ -44,9 +44,12 @@ class TrainTransformer(Component):
         self.model = None
         self.name = model_name.upper()
 
-        self.ntopics = 0
-        if 'num_topics' in self.TRANSFORMERS[self.name]['kwargs']:
-            self.ntopics = self.TRANSFORMERS[self.name]['kwargs']['num_topics']
+        # define the model's training configuration
+        # update default arguments when new provided
+        self.kwargs = dict(self.TRANSFORMERS[self.name]['kwargs'])
+        self.kwargs.update(kwargs)
+
+        self.ntopics = self.kwargs.get('num_topics', 0)
 
         self.logger.info(
             "Initialize the {} transformation model".format(self.name))
@@ -62,14 +65,13 @@ class TrainTransformer(Component):
             .format(self.name, self.ntopics))
 
         # update train argument values for current training configuration
-        kwargs = dict(self.TRANSFORMERS[self.name]['kwargs'])
-        kwargs['corpus'] = corpus
-        if 'id2word' in kwargs:
-            kwargs['id2word'] = dictionary
+        self.kwargs['corpus'] = corpus
+        if 'id2word' in self.kwargs:
+            self.kwargs['id2word'] = dictionary
 
         # train model
         self.timer.start_timer()
-        self.model = self.TRANSFORMERS[self.name]['model'](**kwargs)
+        self.model = self.TRANSFORMERS[self.name]['model'](**self.kwargs)
         self.timer.stop_timer("Model {} trained".format(self.name))
 
         # check changes in model
@@ -115,19 +117,28 @@ class TrainTransformer(Component):
         saved = False
 
         if self.name == 'TFIDF':
-            desc = '(word_id, word_idf) tuples for each word id'
+            desc = 'list with word_idf weight for each word id'
+
+            model_array = [0.0] * len(self.model.idfs)
+            for wid, weight in self.model.idfs.items():
+                model_array[int(wid)] = float(weight)
 
             with open(output, 'w') as ostream:
-                ostream.write(json.dumps(self.model.idfs, indent=2))
+                json.dump(model_array, ostream, indent=2)
 
             saved = True
         elif self.name == 'LSI':
             desc = "{}D array for each word id".format(self.ntopics)
 
+            model_array = [[0.0] * self.ntopics] * self.model.num_terms
+            for wid in range(self.model.num_terms):
+                model_array[int(wid)] = \
+                    [float(x) for x in self.model.projection.u[int(wid)]]
+
             with open(output, 'w') as ostream:
-                for wid in range(self.model.num_terms):
-                    ostream.write(json.dumps(
-                        {wid: list(self.model.projection.u[int(wid)])}) + '\n')
+                for weights in model_array:
+                    json.dump(weights, ostream)
+                    ostream.write('\n')
             saved = True
         else:
             self.logger.warning('Unknown demand. Probably still WIP')

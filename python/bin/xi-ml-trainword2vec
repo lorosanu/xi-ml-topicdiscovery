@@ -69,8 +69,15 @@ for key in ['res', 'input', 'models']:
     if key not in conf:
         exit("[Error] Missing mandatory config option '{}'".format(key))
 
+# dictionary
+dict_file = None
 if 'dictionary' in conf:
-    utils.check_file_readable(os.path.join(conf['res'], conf['dictionary']))
+    dict_file = os.path.join(conf['res'], conf['dictionary'])
+    utils.check_file_readable(dict_file)
+
+# list of training files
+train_files = conf['input']
+train_files = [os.path.join(conf['res'], fn) for fn in train_files]
 
 logger.info("Current configuration: {}".format(conf))
 
@@ -80,17 +87,11 @@ logger.info("Current configuration: {}".format(conf))
 
 timer = Timer()
 
-for trans_name, trans_file in conf['models'].items():
+for trans_name in conf['models'].keys():
     logger.info("Training '{}' model".format(trans_name))
 
-    # dictionary
-    dict_file = None
-    if 'dictionary' in conf:
-        dict_file = os.path.join(conf['res'], conf['dictionary'])
-
-    # list of training files
-    train_files = conf['input']
-    train_files = [os.path.join(conf['res'], fn) for fn in train_files]
+    trans_file = conf['models'][trans_name]['file']
+    trans_kwargs = conf['models'][trans_name].get('kwargs', {})
 
     # files for other model formats
     bin_file = os.path.join(conf['res'], trans_file)
@@ -99,7 +100,7 @@ for trans_name, trans_file in conf['models'].items():
 
     # train model
     timer.start_timer()
-    model = TrainWord2Vec(trans_name)
+    model = TrainWord2Vec(trans_name, **trans_kwargs)
     model.train(train_files)
     timer.stop_timer("{} transformation trained".format(trans_name))
 
